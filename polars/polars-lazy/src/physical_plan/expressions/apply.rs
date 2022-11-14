@@ -105,6 +105,12 @@ impl PhysicalExpr for ApplyExpr {
         if self.allow_rename {
             return self.function.call_udf(&mut inputs);
         }
+        if inputs.len() == 0 {
+            return Ok(Series::new(
+                "imma silly placeholder to let the show go on",
+                [42],
+            ));
+        }
         let in_name = inputs[0].name().to_string();
         let mut out = self.function.call_udf(&mut inputs)?;
         if in_name != out.name() {

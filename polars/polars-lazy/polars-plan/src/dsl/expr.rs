@@ -180,7 +180,11 @@ impl GetOutput {
 
     pub fn map_dtype<F: 'static + Fn(&DataType) -> DataType + Send + Sync>(f: F) -> Self {
         SpecialEq::new(Arc::new(move |_: &Schema, _: Context, flds: &[Field]| {
-            let mut fld = flds[0].clone();
+            let mut fld = if flds.len() >= 1 {
+                flds[0].clone()
+            } else {
+                Field::new("empty", DataType::Null)
+            };
             let new_type = f(fld.data_type());
             fld.coerce(new_type);
             fld
@@ -189,6 +193,9 @@ impl GetOutput {
 
     pub fn super_type() -> Self {
         Self::map_dtypes(|dtypes| {
+            if dtypes.len() == 0 {
+                return DataType::Null;
+            };
             let mut st = dtypes[0].clone();
             for dt in &dtypes[1..] {
                 st = get_supertype(&st, dt).unwrap();
@@ -202,7 +209,12 @@ impl GetOutput {
         F: 'static + Fn(&[&DataType]) -> DataType + Send + Sync,
     {
         SpecialEq::new(Arc::new(move |_: &Schema, _: Context, flds: &[Field]| {
-            let mut fld = flds[0].clone();
+            let mut fld = if flds.len() >= 1 {
+                flds[0].clone()
+            } else {
+                Field::new("empty", DataType::Null)
+            };
+
             let dtypes = flds.iter().map(|fld| fld.data_type()).collect::<Vec<_>>();
             let new_type = f(&dtypes);
             fld.coerce(new_type);
