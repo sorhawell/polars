@@ -1373,8 +1373,21 @@ impl PyDataFrame {
         s.into_series().into()
     }
 
-    pub fn unnest(&self, names: Vec<String>) -> PyResult<Self> {
+    pub fn unnest(&self, names: Option<Vec<String>>) -> PyResult<Self> {
+        //missing names choose to unnest any(if any) column of DataType Struct
+        let names = if let Some(vec_string) = names {
+            vec_string
+        } else {
+            self.df
+                .dtypes()
+                .iter()
+                .zip(self.df.get_column_names().iter())
+                .filter(|(dtype, _)| matches!(dtype, DataType::Struct(_)))
+                .map(|(_, col_name_str)| col_name_str.to_string())
+                .collect::<Vec<String>>()
+        };
         let df = self.df.unnest(names).map_err(PyPolarsErr::from)?;
+
         Ok(df.into())
     }
 }

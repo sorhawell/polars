@@ -67,7 +67,7 @@ def test_rename_fields() -> None:
 
 def test_struct_unnesting() -> None:
     df = pl.DataFrame({"a": [1, 2]})
-    out = df.select(
+    df2 = df.select(
         [
             pl.all().alias("a_original"),
             pl.col("a")
@@ -75,7 +75,8 @@ def test_struct_unnesting() -> None:
             .struct.rename_fields(["a", "a_squared", "mod2eq0"])
             .alias("foo"),
         ]
-    ).unnest("foo")
+    )
+    out = df2.unnest("foo")
 
     expected = pl.DataFrame(
         {
@@ -87,6 +88,9 @@ def test_struct_unnesting() -> None:
     )
 
     assert_frame_equal(out, expected)
+
+    out_default = df2.unnest()
+    assert out_default.frame_equal(expected)
 
     out = (
         df.lazy()
@@ -163,6 +167,11 @@ def test_nested_struct() -> None:
     df = pl.DataFrame({"d": [1, 2, 3], "e": ["foo", "bar", "biz"]})
     # Nest the dataframe
     nest_l1 = df.to_struct("c").to_frame()
+
+    # check to_struct with no name input yield same result, if name "" is set to "c"
+    nest_default = df.to_struct().alias("c").to_frame()
+    assert nest_l1.frame_equal(nest_default)
+
     # Add another column on the same level
     nest_l1 = nest_l1.with_columns(pl.col("c").is_null().alias("b"))
     # Nest the dataframe again
