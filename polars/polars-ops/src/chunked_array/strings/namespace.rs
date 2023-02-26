@@ -66,21 +66,49 @@ pub trait Utf8NameSpaceImpl: AsUtf8 {
     fn parse_int(&self, radix: u32, strict: bool) -> PolarsResult<Int32Chunked> {
         use polars_arrow::utils::CustomIterTools;
         let ca = self.as_utf8();
-        if strict {
-            let f = |opt_s: Option<&str>| -> PolarsResult<Option<i32>> {
-                opt_s
-                    .map(|s| <i32 as Num>::from_str_radix(s, radix))
-                    .transpose()
-                    .map_err(|err| PolarsError::ComputeError(err.to_string().into()))
-            };
-            let ca: PolarsResult<Int32Chunked> = ca.into_iter().map(f).collect();
-            ca
-        } else {
-            let f = |opt_s: Option<&str>| -> Option<i32> {
-                opt_s.and_then(|s| <i32 as Num>::from_str_radix(s, radix).ok())
-            };
-            Ok(ca.into_iter().map(f).collect_trusted())
-        }
+        let f = |opt_s: Option<&str>| -> Option<i32> {
+            opt_s.and_then(|s| <i32 as Num>::from_str_radix(s, radix).ok())
+        };
+        let out: Int32Chunked = ca.into_iter().map(f).collect_trusted();
+
+        if strict && ca.null_count() != out.null_count() {
+            let failure_mask = !ca.is_null() & out.is_null();
+
+            // Do a ChunkedArray stable unique, because helpful for user error msg
+            // Collect in Vec first, because could not find compatible iter for .take() otherwise
+            let vec: Vec<usize> = ca
+                .filter(&failure_mask)?
+                .arg_unique()?
+                .into_no_null_iter()
+                .map(|x| x as usize)
+                .collect_trusted();
+            let failures = ca.filter(&failure_mask)?.take(vec.iter().copied().into())?;
+
+            //recreate first error
+            let first_error = failures
+                .get(0)
+                .map(|s| match <i32 as Num>::from_str_radix(s, radix) {
+                    Ok(_) => None,
+                    Err(err) => Some(err),
+                })
+                .flatten();
+            let first_error_msg = first_error.map_or_else(
+                || "Could unexpectedly not show a ParseIntError".into(),
+                |err| format!("{}", err),
+            );
+
+            Err(PolarsError::ComputeError(
+                format!(
+                    "Strict integer parsing failed for values {}. \
+                    First encountered ParseIntError msg was: '{}'. Consider non strict parsing.",
+                    failures.into_series().fmt_list(),
+                    first_error_msg
+                )
+                .into(),
+            ))?
+        };
+
+        Ok(out)
     }
 
     /// Get the length of the string values as number of chars.
