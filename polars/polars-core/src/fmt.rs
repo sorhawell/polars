@@ -20,7 +20,7 @@ use comfy_table::modifiers::*;
 use comfy_table::presets::*;
 #[cfg(any(feature = "fmt", feature = "fmt_no_tty"))]
 use comfy_table::*;
-use num::{Num, NumCast};
+use num_traits::{Num, NumCast};
 
 use crate::config::*;
 use crate::prelude::*;
@@ -75,7 +75,7 @@ macro_rules! format_array {
                 .map_or(LIMIT, |n: i64| if n < 0 { $a.len() } else { n as usize });
             std::cmp::min(limit, $a.len())
         };
-        let write_fn = |v, f: &mut Formatter| {
+        let write_fn = |v, f: &mut Formatter| -> fmt::Result {
             if truncate {
                 let v = format!("{}", v);
                 let v_trunc = &v[..v
@@ -172,7 +172,6 @@ impl Debug for Utf8Chunked {
     }
 }
 
-#[cfg(feature = "dtype-binary")]
 impl Debug for BinaryChunked {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         format_array!(f, self, "binary", self.name(), "ChunkedArray")
@@ -280,6 +279,11 @@ impl Debug for Series {
                 let dt = format!("{}", self.dtype());
                 format_array!(f, self.duration().unwrap(), &dt, self.name(), "Series")
             }
+            #[cfg(feature = "dtype-decimal")]
+            DataType::Decimal(_, _) => {
+                let dt = format!("{}", self.dtype());
+                format_array!(f, self.decimal().unwrap(), &dt, self.name(), "Series")
+            }
             DataType::List(_) => {
                 let dt = format!("{}", self.dtype());
                 format_array!(f, self.list().unwrap(), &dt, self.name(), "Series")
@@ -301,7 +305,6 @@ impl Debug for Series {
             DataType::Null => {
                 writeln!(f, "nullarray")
             }
-            #[cfg(feature = "dtype-binary")]
             DataType::Binary => {
                 format_array!(f, self.binary().unwrap(), "binary", self.name(), "Series")
             }
@@ -729,7 +732,6 @@ impl Display for AnyValue<'_> {
             AnyValue::Boolean(v) => write!(f, "{}", *v),
             AnyValue::Utf8(v) => write!(f, "{}", format_args!("\"{v}\"")),
             AnyValue::Utf8Owned(v) => write!(f, "{}", format_args!("\"{v}\"")),
-            #[cfg(feature = "dtype-binary")]
             AnyValue::Binary(_) | AnyValue::BinaryOwned(_) => write!(f, "[binary data]"),
             #[cfg(feature = "dtype-date")]
             AnyValue::Date(v) => write!(f, "{}", date32_to_date(*v)),
@@ -776,6 +778,8 @@ impl Display for AnyValue<'_> {
             }
             #[cfg(feature = "dtype-struct")]
             AnyValue::StructOwned(payload) => fmt_struct(f, &payload.0),
+            #[cfg(feature = "dtype-decimal")]
+            AnyValue::Decimal(v, scale) => fmt_decimal(f, *v, *scale),
         }
     }
 }
@@ -885,7 +889,6 @@ impl FmtList for Utf8Chunked {
     }
 }
 
-#[cfg(feature = "dtype-binary")]
 impl FmtList for BinaryChunked {
     fn fmt_list(&self) -> String {
         impl_fmt_list!(self)
@@ -946,6 +949,123 @@ impl<T: PolarsObject> FmtList for ObjectChunked<T> {
         impl_fmt_list!(self)
     }
 }
+
+#[cfg(feature = "dtype-decimal")]
+mod decimal {
+    use std::fmt::Formatter;
+    use std::{fmt, ptr, str};
+
+    const BUF_LEN: usize = 48;
+
+    #[derive(Clone, Copy)]
+    pub struct FormatBuffer {
+        data: [u8; BUF_LEN],
+        len: usize,
+    }
+
+    impl FormatBuffer {
+        #[inline]
+        pub const fn new() -> Self {
+            Self {
+                data: [0; BUF_LEN],
+                len: 0,
+            }
+        }
+
+        #[inline]
+        pub fn as_str(&self) -> &str {
+            unsafe { str::from_utf8_unchecked(&self.data[..self.len]) }
+        }
+    }
+
+    const POW10: [i128; 38] = [
+        1,
+        10,
+        100,
+        1000,
+        10000,
+        100000,
+        1000000,
+        10000000,
+        100000000,
+        1000000000,
+        10000000000,
+        100000000000,
+        1000000000000,
+        10000000000000,
+        100000000000000,
+        1000000000000000,
+        10000000000000000,
+        100000000000000000,
+        1000000000000000000,
+        10000000000000000000,
+        100000000000000000000,
+        1000000000000000000000,
+        10000000000000000000000,
+        100000000000000000000000,
+        1000000000000000000000000,
+        10000000000000000000000000,
+        100000000000000000000000000,
+        1000000000000000000000000000,
+        10000000000000000000000000000,
+        100000000000000000000000000000,
+        1000000000000000000000000000000,
+        10000000000000000000000000000000,
+        100000000000000000000000000000000,
+        1000000000000000000000000000000000,
+        10000000000000000000000000000000000,
+        100000000000000000000000000000000000,
+        1000000000000000000000000000000000000,
+        10000000000000000000000000000000000000,
+    ];
+
+    pub fn format_decimal(v: i128, scale: usize, trim_zeros: bool) -> FormatBuffer {
+        const ZEROS: [u8; BUF_LEN] = [b'0'; BUF_LEN];
+
+        let mut buf = FormatBuffer::new();
+        let factor = POW10[scale]; //10_i128.pow(scale as _);
+        let (div, rem) = (v / factor, v.abs() % factor);
+
+        unsafe {
+            let mut ptr = buf.data.as_mut_ptr();
+            if div == 0 && v < 0 {
+                *ptr = b'-';
+                ptr = ptr.add(1);
+                buf.len = 1;
+            }
+            let n_whole = itoap::write_to_ptr(ptr, div);
+            buf.len += n_whole;
+            if rem != 0 {
+                ptr = ptr.add(n_whole);
+                *ptr = b'.';
+                ptr = ptr.add(1);
+                let mut frac_buf = [0_u8; BUF_LEN];
+                let n_frac = itoap::write_to_ptr(frac_buf.as_mut_ptr(), rem);
+                ptr::copy_nonoverlapping(ZEROS.as_ptr(), ptr, scale - n_frac);
+                ptr = ptr.add(scale - n_frac);
+                ptr::copy_nonoverlapping(frac_buf.as_mut_ptr(), ptr, n_frac);
+                buf.len += 1 + scale;
+                if trim_zeros {
+                    ptr = ptr.add(n_frac - 1);
+                    while *ptr == b'0' {
+                        ptr = ptr.sub(1);
+                        buf.len -= 1;
+                    }
+                }
+            }
+        }
+
+        buf
+    }
+
+    #[inline]
+    pub fn fmt_decimal(f: &mut Formatter<'_>, v: i128, scale: usize) -> fmt::Result {
+        f.write_str(format_decimal(v, scale, !f.alternate()).as_str())
+    }
+}
+
+#[cfg(feature = "dtype-decimal")]
+pub use decimal::fmt_decimal;
 
 #[cfg(all(
     test,

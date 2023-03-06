@@ -159,7 +159,6 @@ impl Series {
     }
 
     /// Unpack to ChunkedArray of dtype binary
-    #[cfg(feature = "dtype-binary")]
     pub fn binary(&self) -> PolarsResult<&BinaryChunked> {
         match self.dtype() {
             DataType::Binary => unsafe {
@@ -219,6 +218,19 @@ impl Series {
             },
             dt => Err(PolarsError::SchemaMisMatch(
                 format!("Series of dtype: {dt:?} != Duration").into(),
+            )),
+        }
+    }
+
+    /// Unpack to ChunkedArray of dtype decimal
+    #[cfg(feature = "dtype-decimal")]
+    pub fn decimal(&self) -> PolarsResult<&DecimalChunked> {
+        match self.dtype() {
+            DataType::Decimal(_, _) => unsafe {
+                Ok(&*(self.as_ref() as *const dyn SeriesTrait as *const DecimalChunked))
+            },
+            dt => Err(PolarsError::SchemaMisMatch(
+                format!("Series of dtype: {dt:?} != Decimal").into(),
             )),
         }
     }

@@ -8,8 +8,9 @@ import os
 import re
 import sys
 import warnings
-from collections.abc import MappingView, Reversible, Sized
-from datetime import date, datetime, time, timedelta, timezone, tzinfo
+from collections.abc import MappingView, Sized
+from datetime import datetime, time, timedelta, timezone
+from decimal import Context, Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -22,13 +23,7 @@ from typing import (
 )
 
 import polars.internals as pli
-from polars.datatypes import (
-    Date,
-    Datetime,
-    Int64,
-    PolarsDataType,
-    is_polars_dtype,
-)
+from polars.datatypes import Date, Datetime, Int64, is_polars_dtype
 from polars.dependencies import _ZONEINFO_AVAILABLE, zoneinfo
 
 with contextlib.suppress(ImportError):  # Module not available when building docs
@@ -43,10 +38,6 @@ if sys.version_info >= (3, 9):
 elif _ZONEINFO_AVAILABLE:
     from backports.zoneinfo._zoneinfo import ZoneInfo
 
-if sys.version_info >= (3, 10):
-    from typing import ParamSpec, TypeGuard
-else:
-    from typing_extensions import ParamSpec, TypeGuard
 
 # note: reversed views don't match as instances of MappingView
 if sys.version_info >= (3, 11):
@@ -54,9 +45,20 @@ if sys.version_info >= (3, 11):
     _reverse_mapping_views = tuple(type(reversed(view)) for view in _views)
 
 if TYPE_CHECKING:
+    from collections.abc import Reversible
+    from datetime import date, tzinfo
     from pathlib import Path
 
+    from polars.datatypes import PolarsDataType
     from polars.internals.type_aliases import SizeUnit, TimeUnit
+
+    if sys.version_info >= (3, 10):
+        from typing import ParamSpec, TypeGuard
+    else:
+        from typing_extensions import ParamSpec, TypeGuard
+
+    P = ParamSpec("P")
+    T = TypeVar("T")
 
 
 def _process_null_values(
@@ -83,23 +85,41 @@ def _timedelta_to_pl_duration(td: timedelta | str | None) -> str | None:
     if td is None or isinstance(td, str):
         return td
     else:
-        d = td.days and f"{td.days}d" or ""
-        s = td.seconds and f"{td.seconds}s" or ""
-        us = td.microseconds and f"{td.microseconds}us" or ""
+        if td.days >= 0:
+            d = td.days and f"{td.days}d" or ""
+            s = td.seconds and f"{td.seconds}s" or ""
+            us = td.microseconds and f"{td.microseconds}us" or ""
+        else:
+            if not td.seconds and not td.microseconds:
+                d = td.days and f"{td.days}d" or ""
+                s = ""
+                us = ""
+            else:
+                corrected_d = td.days + 1
+                d = corrected_d and f"{corrected_d}d" or "-"
+                corrected_seconds = 24 * 3600 - (td.seconds + (td.microseconds > 0))
+                s = corrected_seconds and f"{corrected_seconds}s" or ""
+                us = td.microseconds and f"{10**6 - td.microseconds}us" or ""
+
         return f"{d}{s}{us}"
 
 
 def _datetime_to_pl_timestamp(dt: datetime, tu: TimeUnit | None) -> int:
     """Convert a python datetime to a timestamp in nanoseconds."""
+    dt = dt.replace(tzinfo=timezone.utc)
     if tu == "ns":
-        return int(dt.replace(tzinfo=timezone.utc).timestamp() * 1e9)
+        nanos = dt.microsecond * 1000
+        return int(dt.timestamp()) * 1_000_000_000 + nanos
     elif tu == "us":
-        return int(dt.replace(tzinfo=timezone.utc).timestamp() * 1e6)
+        micros = dt.microsecond
+        return int(dt.timestamp()) * 1_000_000 + micros
     elif tu == "ms":
-        return int(dt.replace(tzinfo=timezone.utc).timestamp() * 1e3)
+        millis = dt.microsecond // 1000
+        return int(dt.timestamp()) * 1_000 + millis
     elif tu is None:
         # python has us precision
-        return int(dt.replace(tzinfo=timezone.utc).timestamp() * 1e6)
+        micros = dt.microsecond
+        return int(dt.timestamp()) * 1_000_000 + micros
     else:
         raise ValueError(f"tu must be one of {{'ns', 'us', 'ms'}}, got {tu}")
 
@@ -121,6 +141,23 @@ def _timedelta_to_pl_timedelta(td: timedelta, tu: TimeUnit | None = None) -> int
         return int(td.total_seconds() * 1e6)
     else:
         raise ValueError(f"tu must be one of {{'ns', 'us', 'ms'}}, got {tu}")
+
+
+_create_decimal = [Decimal] + [Context(prec=p).create_decimal for p in range(1, 63)]
+
+
+@functools.lru_cache(None)
+def _create_decimal_with_prec(
+    precision: int,
+) -> Callable[[tuple[int, Sequence[int], int]], Decimal]:
+    # pre-cache contexts so we don't have to spend time on recreating them every time
+    return Context(prec=precision).create_decimal
+
+
+def _to_python_decimal(
+    sign: int, digits: Sequence[int], prec: int, scale: int
+) -> Decimal:
+    return _create_decimal_with_prec(prec)((sign, digits, scale))
 
 
 def _is_generator(val: object) -> bool:
@@ -383,10 +420,6 @@ def parse_version(version: Sequence[str | int]) -> tuple[int, ...]:
 def threadpool_size() -> int:
     """Get the size of polars' thread pool."""
     return _pool_size()
-
-
-P = ParamSpec("P")
-T = TypeVar("T")
 
 
 def _rename_kwargs(

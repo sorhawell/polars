@@ -18,6 +18,7 @@ def test_to_from_buffer(df: pl.DataFrame, buf: io.IOBase) -> None:
     assert_frame_equal_local_categoricals(df, read_df)
 
 
+@pytest.mark.write_disk()
 def test_to_from_file(df: pl.DataFrame) -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
         file_path = Path(temp_dir) / "small.json"
@@ -103,3 +104,13 @@ def test_ndjson_nested_utf8_int() -> None:
     assert pl.read_ndjson(io.StringIO(ndjson)).to_dict(False) == {
         "Accumulables": [[{"Value": "32395888"}, {"Value": "539454"}]]
     }
+
+
+def test_write_json_categoricals() -> None:
+    data = {"column": ["test1", "test2", "test3", "test4"]}
+    df = pl.DataFrame(data).with_columns(pl.col("column").cast(pl.Categorical))
+
+    assert (
+        df.write_json(row_oriented=True, file=None)
+        == '[{"column":"test1"},{"column":"test2"},{"column":"test3"},{"column":"test4"}]'
+    )

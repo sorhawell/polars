@@ -17,7 +17,6 @@ from polars.datatypes import (
     Float64,
     Int32,
     Int64,
-    PolarsDataType,
     Time,
     UInt32,
     UInt64,
@@ -1667,6 +1666,17 @@ def test_arg_sort() -> None:
     assert_series_equal(s.arg_sort(descending=True), expected_descending)
 
 
+def test_argsort_deprecated() -> None:
+    s = pl.Series("a", [5, 3, 4, 1, 2])
+    expected = pl.Series("a", [3, 4, 1, 2, 0], dtype=UInt32)
+    with pytest.deprecated_call():
+        assert_series_equal(s.argsort(), expected)
+
+    expected_descending = pl.Series("a", [0, 2, 1, 4, 3], dtype=UInt32)
+    with pytest.deprecated_call():
+        assert_series_equal(s.argsort(descending=True), expected_descending)
+
+
 def test_arg_min_and_arg_max() -> None:
     s = pl.Series("a", [5, 3, 4, 1, 2])
     assert s.arg_min() == 3
@@ -1924,12 +1934,7 @@ def test_trigonometric(f: str) -> None:
     expected = (
         pl.Series("a", getattr(np, f)(s.to_numpy()))
         .to_frame()
-        .with_columns(
-            pl.when(s.is_null())  # type: ignore[arg-type]
-            .then(None)
-            .otherwise(pl.col("a"))
-            .alias("a")
-        )
+        .with_columns(pl.when(s.is_null()).then(None).otherwise(pl.col("a")).alias("a"))
         .to_series()
     )
     result = getattr(s, f)()
@@ -2348,7 +2353,7 @@ def test_builtin_abs() -> None:
     ],
 )
 def test_from_epoch_expr(
-    value: int, unit: EpochTimeUnit, exp: date | datetime, exp_type: PolarsDataType
+    value: int, unit: EpochTimeUnit, exp: date | datetime, exp_type: pl.PolarsDataType
 ) -> None:
     s = pl.Series("timestamp", [value, None])
     result = pl.from_epoch(s, unit=unit)
@@ -2473,7 +2478,7 @@ def test_map_dict() -> None:
     ],
 )
 def test_upper_lower_bounds(
-    dtype: PolarsDataType, upper: int | float, lower: int | float
+    dtype: pl.PolarsDataType, upper: int | float, lower: int | float
 ) -> None:
     s = pl.Series("s", dtype=dtype)
     assert s.lower_bound().item() == lower
@@ -2523,3 +2528,37 @@ def test_from_epoch_seq_input() -> None:
     expected = pl.Series([datetime(2006, 5, 17, 15, 34, 4)])
     result = pl.from_epoch(seq_input)
     assert_series_equal(result, expected)
+
+
+def test_cut() -> None:
+    a = pl.Series("a", [v / 10 for v in range(-30, 30, 5)])
+    out = a.cut(bins=[-1, 1])
+
+    assert out.shape == (12, 3)
+    assert out.filter(pl.col("break_point") < 1e9).to_dict(False) == {
+        "a": [-3.0, -2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0],
+        "break_point": [-1.0, -1.0, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0],
+        "category": [
+            "(-inf, -1.0]",
+            "(-inf, -1.0]",
+            "(-inf, -1.0]",
+            "(-inf, -1.0]",
+            "(-inf, -1.0]",
+            "(-1.0, 1.0]",
+            "(-1.0, 1.0]",
+            "(-1.0, 1.0]",
+            "(-1.0, 1.0]",
+        ],
+    }
+
+    # test cut on integers #4939
+    inf = float("inf")
+    df = pl.DataFrame({"a": list(range(5))})
+    ser = df.select("a").to_series()
+    assert ser.cut(bins=[-1, 1]).rows() == [
+        (0.0, 1.0, "(-1.0, 1.0]"),
+        (1.0, 1.0, "(-1.0, 1.0]"),
+        (2.0, inf, "(1.0, inf]"),
+        (3.0, inf, "(1.0, inf]"),
+        (4.0, inf, "(1.0, inf]"),
+    ]

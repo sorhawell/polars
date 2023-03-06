@@ -1001,7 +1001,7 @@ impl DataFrame {
     ///                         "Tax revenue (% GDP)" => [Some(32.7), None, None])?;
     /// assert_eq!(df1.shape(), (3, 2));
     ///
-    /// let df2: DataFrame = df1.drop_nulls(None)?;
+    /// let df2: DataFrame = df1.drop_nulls::<String>(None)?;
     /// assert_eq!(df2.shape(), (1, 2));
     /// println!("{}", df2);
     /// # Ok::<(), PolarsError>(())
@@ -1019,7 +1019,7 @@ impl DataFrame {
     /// | Malta   | 32.7                |
     /// +---------+---------------------+
     /// ```
-    pub fn drop_nulls(&self, subset: Option<&[String]>) -> PolarsResult<Self> {
+    pub fn drop_nulls<S: AsRef<str>>(&self, subset: Option<&[S]>) -> PolarsResult<Self> {
         let selected_series;
 
         let mut iter = match subset {
@@ -1142,7 +1142,7 @@ impl DataFrame {
             }
             // special case for literals
             else if height == 0 && series.len() == 1 {
-                let s = series.slice(0, 0);
+                let s = series.clear();
                 df.add_column_by_search(s)?;
                 Ok(df)
             } else {
@@ -1158,6 +1158,16 @@ impl DataFrame {
         }
         let series = column.into_series();
         inner(self, series)
+    }
+
+    /// Adds a column to the `DataFrame` without doing any checks
+    /// on length or duplicates.
+    ///
+    /// # Safety
+    /// The caller must ensure `column.len() == self.height()` .
+    pub unsafe fn with_column_unchecked(&mut self, column: Series) -> &mut Self {
+        self.get_columns_mut().push(column);
+        self
     }
 
     fn add_column_by_schema(&mut self, s: Series, schema: &Schema) -> PolarsResult<()> {
@@ -1209,7 +1219,7 @@ impl DataFrame {
         }
         // special case for literals
         else if height == 0 && series.len() == 1 {
-            let s = series.slice(0, 0);
+            let s = series.clear();
             self.add_column_by_schema(s, schema)?;
             Ok(self)
         } else {
@@ -1841,8 +1851,8 @@ impl DataFrame {
             _ => {
                 #[cfg(feature = "sort_multiple")]
                 {
-                    if std::env::var("POLARS_ROW_FMT_SORT").is_ok() {
-                        argsort_multiple_row_fmt(&by_column, &descending, nulls_last, parallel)?
+                    if nulls_last || std::env::var("POLARS_ROW_FMT_SORT").is_ok() {
+                        argsort_multiple_row_fmt(&by_column, descending, nulls_last, parallel)?
                     } else {
                         let (first, by_column, descending) =
                             prepare_arg_sort(by_column, descending)?;
@@ -2270,6 +2280,11 @@ impl DataFrame {
         DataFrame::new_no_checks(col)
     }
 
+    pub fn clear(&self) -> Self {
+        let col = self.columns.iter().map(|s| s.clear()).collect::<Vec<_>>();
+        DataFrame::new_no_checks(col)
+    }
+
     #[must_use]
     pub fn slice_par(&self, offset: i64, length: usize) -> Self {
         if offset == 0 && length == self.height() {
@@ -2451,7 +2466,7 @@ impl DataFrame {
     ///
     /// let df2: DataFrame = df1.describe(None)?;
     /// assert_eq!(df2.shape(), (9, 4));
-    /// dbg!(df2);
+    /// println!("{}", df2);
     /// # Ok::<(), PolarsError>(())
     /// ```
     ///
@@ -3659,7 +3674,7 @@ mod test {
         )?;
 
         // has got columns, but no rows
-        let mut df = base.slice(0, 0);
+        let mut df = base.clear();
         let out = df.with_column(Series::new("c", [1]))?;
         assert_eq!(out.shape(), (0, 3));
         assert!(out.iter().all(|s| s.len() == 0));

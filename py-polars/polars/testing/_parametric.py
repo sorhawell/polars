@@ -6,13 +6,11 @@ import warnings
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from math import isfinite
-from typing import Any, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 from hypothesis import settings
 from hypothesis.errors import InvalidArgument, NonInteractiveExampleWarning
 from hypothesis.strategies import (
-    DrawFn,
-    SearchStrategy,
     booleans,
     composite,
     dates,
@@ -41,7 +39,6 @@ from polars.datatypes import (
     Int16,
     Int32,
     Int64,
-    PolarsDataType,
     Time,
     UInt8,
     UInt16,
@@ -53,6 +50,12 @@ from polars.datatypes import (
 )
 from polars.string_cache import StringCache
 from polars.testing.asserts import is_categorical_dtype
+
+if TYPE_CHECKING:
+    from hypothesis.strategies import DrawFn, SearchStrategy
+
+    from polars.datatypes import OneOrMoreDataTypes, PolarsDataType
+
 
 # Default profile (eg: running locally)
 common_settings = {"print_blob": True, "deadline": None}
@@ -210,7 +213,7 @@ class column:
 def columns(
     cols: int | Sequence[str] | None = None,
     *,
-    dtype: PolarsDataType | Sequence[PolarsDataType] | None = None,
+    dtype: OneOrMoreDataTypes | None = None,
     min_cols: int | None = 0,
     max_cols: int | None = MAX_COLS,
     unique: bool = False,
@@ -559,8 +562,6 @@ def dataframes(
     │ 575050513 ┆ NaN        │
     └───────────┴────────────┘
     """  # noqa: 501
-    if isinstance(cols, int):
-        cols = columns(cols)
     if isinstance(min_size, int) and min_cols in (0, None):
         min_cols = 1
 
@@ -574,8 +575,8 @@ def dataframes(
     def draw_frames(draw: DrawFn) -> pli.DataFrame | pli.LazyFrame:
         with StringCache():
             # if not given, create 'n' cols with random dtypes
-            if cols is None:
-                n = between(
+            if cols is None or isinstance(cols, int):
+                n = cols or between(
                     draw, int, min_=(min_cols or 0), max_=(max_cols or MAX_COLS)
                 )
                 dtypes_ = [draw(sampled_from(selectable_dtypes)) for _ in range(n)]
@@ -583,7 +584,7 @@ def dataframes(
             elif isinstance(cols, column):
                 coldefs = [cols]
             else:
-                coldefs = list(cols)  # type: ignore[arg-type]
+                coldefs = list(cols)
 
             # append any explicitly provided cols
             coldefs.extend(include_cols or ())

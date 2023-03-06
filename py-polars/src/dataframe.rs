@@ -31,7 +31,7 @@ use crate::conversion::{ObjectValue, Wrap};
 use crate::error::PyPolarsErr;
 use crate::file::{get_either_file, get_file_like, get_mmap_bytes_reader, EitherRustPythonFile};
 use crate::lazy::dataframe::PyLazyFrame;
-use crate::prelude::dicts_to_rows;
+use crate::prelude::{dicts_to_rows, strings_to_smartstrings};
 use crate::series::{to_pyseries_collection, to_series_collection, PySeries};
 use crate::{arrow_interop, py_modules, PyExpr};
 
@@ -59,10 +59,14 @@ impl PyDataFrame {
         let schema =
             rows_to_schema_supertypes(&rows, infer_schema_length.map(|n| std::cmp::max(1, n)))
                 .map_err(PyPolarsErr::from)?;
-        // replace inferred nulls with boolean
+        // replace inferred nulls with boolean and erase scale from inferred decimals
         let fields = schema.iter_fields().map(|mut fld| match fld.data_type() {
             DataType::Null => {
                 fld.coerce(DataType::Boolean);
+                fld
+            }
+            DataType::Decimal(_, _) => {
+                fld.coerce(DataType::Decimal(None, None));
                 fld
             }
             _ => fld,
@@ -212,7 +216,7 @@ impl PyDataFrame {
             .with_columns(columns)
             .with_n_threads(n_threads)
             .with_path(path)
-            .with_dtypes(overwrite_dtype.as_ref())
+            .with_dtypes(overwrite_dtype.map(Arc::new))
             .with_dtypes_slice(overwrite_dtype_slice.as_deref())
             .low_memory(low_memory)
             .with_null_values(null_values)
@@ -621,6 +625,7 @@ impl PyDataFrame {
                     PyTuple::new(
                         py,
                         self.df.get_columns().iter().map(|s| match s.dtype() {
+                            DataType::Null => py.None(),
                             DataType::Object(_) => {
                                 let obj: Option<&ObjectValue> =
                                     s.get_object(idx).map(|any| any.into());
@@ -1093,16 +1098,16 @@ impl PyDataFrame {
 
     pub fn melt(
         &self,
-        id_vars: Vec<String>,
-        value_vars: Vec<String>,
-        value_name: Option<String>,
-        variable_name: Option<String>,
+        id_vars: Vec<&str>,
+        value_vars: Vec<&str>,
+        value_name: Option<&str>,
+        variable_name: Option<&str>,
     ) -> PyResult<Self> {
         let args = MeltArgs {
-            id_vars,
-            value_vars,
-            value_name,
-            variable_name,
+            id_vars: strings_to_smartstrings(id_vars),
+            value_vars: strings_to_smartstrings(value_vars),
+            value_name: value_name.map(|s| s.into()),
+            variable_name: variable_name.map(|s| s.into()),
         };
 
         let df = self.df.melt2(args).map_err(PyPolarsErr::from)?;
@@ -1351,8 +1356,12 @@ impl PyDataFrame {
         s.into_series().into()
     }
 
-    pub fn unnest(&self, names: Vec<String>) -> PyResult<Self> {
-        let df = self.df.unnest(names).map_err(PyPolarsErr::from)?;
+    pub fn unnest(&self, columns: Vec<String>) -> PyResult<Self> {
+        let df = self.df.unnest(columns).map_err(PyPolarsErr::from)?;
         Ok(df.into())
+    }
+
+    pub fn clear(&self) -> Self {
+        self.df.clear().into()
     }
 }

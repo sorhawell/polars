@@ -6,6 +6,8 @@ use polars_core::prelude::*;
 use polars_core::utils::get_supertype;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde::{Deserializer, Serializer};
 
 use crate::dsl::function_expr::FunctionExpr;
 use crate::prelude::*;
@@ -83,6 +85,27 @@ impl Debug for dyn RenameAliasFn {
 /// Wrapper type that has special equality properties
 /// depending on the inner type specialization
 pub struct SpecialEq<T>(T);
+
+#[cfg(feature = "serde")]
+impl<T: Serialize> Serialize for SpecialEq<T> {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.0.serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'a, T: Deserialize<'a>> Deserialize<'a> for SpecialEq<T> {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'a>,
+    {
+        let t = T::deserialize(deserializer)?;
+        Ok(SpecialEq(t))
+    }
+}
 
 impl<T> SpecialEq<T> {
     pub fn new(val: T) -> Self {
@@ -278,7 +301,9 @@ impl AsRef<Expr> for AggExpr {
     }
 }
 
-/// Queries consists of multiple expressions.
+/// Expressions that can be used in various contexts. Queries consist of multiple expressions. When using the polars
+/// lazy API, don't construct an `Expr` directly; instead, create one using the functions in the `polars_lazy::dsl`
+/// module. See that module's docs for more info.
 #[derive(Clone, PartialEq)]
 #[must_use]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

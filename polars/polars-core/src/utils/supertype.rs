@@ -196,10 +196,8 @@ pub fn get_supertype(l: &DataType, r: &DataType) -> Option<DataType> {
             (Time, Float64) => Some(Float64),
 
             // every known type can be casted to a string except binary
-            #[cfg(feature = "dtype-binary")]
             (dt, Utf8) if dt != &DataType::Unknown && dt != &DataType::Binary => Some(Utf8),
 
-            #[cfg(not(feature = "dtype-binary"))]
             (dt, Utf8) if dt != &DataType::Unknown => Some(Utf8),
 
             (dt, Null) => Some(dt.clone()),
@@ -265,6 +263,14 @@ pub fn get_supertype(l: &DataType, r: &DataType) -> Option<DataType> {
                 }
                 Some(Struct(new_fields))
             }
+            #[cfg(feature = "dtype-decimal")]
+            (d @ Decimal(_, _), dt) if dt.is_signed() || dt.is_unsigned() => Some(d.clone()),
+            #[cfg(feature = "dtype-decimal")]
+            (Decimal(p1, s1), Decimal(p2, s2)) => {
+                Some(Decimal((*p1).zip(*p2).map(|(p1, p2)| p1.max(p2)), (*s1).max(*s2)))
+            }
+            #[cfg(feature = "dtype-decimal")]
+            (Decimal(_, _), f @ (Float32 | Float64)) => Some(f.clone()),
             _ => None,
         }
     }

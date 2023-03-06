@@ -88,12 +88,11 @@ dtype-duration = ["temporal"]
 dtype-time = ["temporal"]
 dtype-i8 = []
 dtype-i16 = []
-dtype-i128 = []
+dtype-decimal = ["dep:itoap"]
 dtype-u8 = []
 dtype-u16 = []
 dtype-categorical = []
 dtype-struct = []
-dtype-binary = []
 
 parquet = ["arrow/io_parquet"]
 
@@ -101,7 +100,7 @@ parquet = ["arrow/io_parquet"]
 bigidx = ["polars-arrow/bigidx"]
 python = []
 
-serde-lazy = ["serde", "polars-arrow/serde", "indexmap/serde"]
+serde-lazy = ["serde", "polars-arrow/serde", "indexmap/serde", "smartstring/serde", "chrono/serde"]
 
 docs-selection = [
   "ndarray",
@@ -160,8 +159,9 @@ chrono-tz = { version = "0.8", optional = true }
 comfy-table = { version = "6.1.4", optional = true, default_features = false }
 hashbrown.workspace = true
 indexmap = { version = "1", features = ["std"] }
+itoap = { version = "1", optional = true }
 ndarray = { version = "0.15", optional = true, default_features = false }
-num.workspace = true
+num-traits.workspace = true
 object_store = { version = "0.5.3", default-features = false, optional = true }
 once_cell.workspace = true
 polars-arrow = { version = "0.27.2", path = "../polars-arrow", features = ["compute"] }
@@ -175,7 +175,7 @@ regex = { version = "1.6", optional = true }
 # activate if you want serde support for Series and DataFrames
 serde = { version = "1", features = ["derive"], optional = true }
 serde_json = { version = "1", optional = true }
-smartstring = { version = "1" }
+smartstring.workspace = true
 thiserror.workspace = true
 url = { version = "2.3.1", optional = true }
 xxhash-rust.workspace = true

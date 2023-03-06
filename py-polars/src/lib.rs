@@ -235,15 +235,16 @@ fn using_string_cache() -> bool {
 }
 
 #[pyfunction]
-fn concat_str(s: Vec<dsl::PyExpr>, sep: &str) -> dsl::PyExpr {
+fn concat_str(s: Vec<dsl::PyExpr>, separator: &str) -> dsl::PyExpr {
     let s = s.into_iter().map(|e| e.inner).collect::<Vec<_>>();
-    polars_rs::lazy::dsl::concat_str(s, sep).into()
+    polars_rs::lazy::dsl::concat_str(s, separator).into()
 }
 
 #[pyfunction]
-fn concat_lst(s: Vec<dsl::PyExpr>) -> dsl::PyExpr {
+fn concat_lst(s: Vec<dsl::PyExpr>) -> PyResult<dsl::PyExpr> {
     let s = s.into_iter().map(|e| e.inner).collect::<Vec<_>>();
-    polars_rs::lazy::dsl::concat_lst(s).into()
+    let expr = polars_rs::lazy::dsl::concat_lst(s).map_err(PyPolarsErr::from)?;
+    Ok(expr.into())
 }
 
 #[pyfunction]
@@ -309,7 +310,7 @@ fn concat_df(dfs: &PyAny, py: Python) -> PyResult<PyDataFrame> {
     let first = iter.next().unwrap()?;
 
     let first_rdf = get_df(first)?;
-    let identity_df = first_rdf.slice(0, 0);
+    let identity_df = first_rdf.clear();
 
     let mut rdfs: Vec<PolarsResult<DataFrame>> = vec![Ok(first_rdf)];
 

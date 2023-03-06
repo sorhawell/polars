@@ -93,38 +93,10 @@ def test_all_any_horizontally() -> None:
     assert_frame_equal(result, expected)
 
 
-def test_cut() -> None:
-    a = pl.Series("a", [v / 10 for v in range(-30, 30, 5)])
-    out = pl.cut(a, bins=[-1, 1])
-
-    assert out.shape == (12, 3)
-    assert out.filter(pl.col("break_point") < 1e9).to_dict(False) == {
-        "a": [-3.0, -2.5, -2.0, -1.5, -1.0, -0.5, 0.0, 0.5, 1.0],
-        "break_point": [-1.0, -1.0, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, 1.0],
-        "category": [
-            "(-inf, -1.0]",
-            "(-inf, -1.0]",
-            "(-inf, -1.0]",
-            "(-inf, -1.0]",
-            "(-inf, -1.0]",
-            "(-1.0, 1.0]",
-            "(-1.0, 1.0]",
-            "(-1.0, 1.0]",
-            "(-1.0, 1.0]",
-        ],
-    }
-
-    # test cut on integers #4939
-    inf = float("inf")
-    df = pl.DataFrame({"a": list(range(5))})
-    ser = df.select("a").to_series()
-    assert pl.cut(ser, bins=[-1, 1]).rows() == [
-        (0.0, 1.0, "(-1.0, 1.0]"),
-        (1.0, 1.0, "(-1.0, 1.0]"),
-        (2.0, inf, "(1.0, inf]"),
-        (3.0, inf, "(1.0, inf]"),
-        (4.0, inf, "(1.0, inf]"),
-    ]
+def test_cut_deprecated() -> None:
+    with pytest.deprecated_call():
+        a = pl.Series("a", [v / 10 for v in range(-30, 30, 5)])
+        pl.cut(a, bins=[-1, 1])
 
 
 def test_null_handling_correlation() -> None:
@@ -132,8 +104,8 @@ def test_null_handling_correlation() -> None:
 
     out = df.select(
         [
-            pl.pearson_corr("a", "b").alias("pearson"),
-            pl.spearman_rank_corr("a", "b").alias("spearman"),
+            pl.corr("a", "b").alias("pearson"),
+            pl.corr("a", "b", method="spearman").alias("spearman"),
         ]
     )
     assert out["pearson"][0] == pytest.approx(1.0)
@@ -143,9 +115,11 @@ def test_null_handling_correlation() -> None:
     df1 = pl.DataFrame({"a": [None, 1, 2], "b": [None, 2, 1]})
     df2 = pl.DataFrame({"a": [np.nan, 1, 2], "b": [np.nan, 2, 1]})
 
-    assert np.isclose(df1.select(pl.spearman_rank_corr("a", "b")).item(), -1.0)
+    assert np.isclose(df1.select(pl.corr("a", "b", method="spearman")).item(), -1.0)
     assert (
-        str(df2.select(pl.spearman_rank_corr("a", "b", propagate_nans=True)).item())
+        str(
+            df2.select(pl.corr("a", "b", method="spearman", propagate_nans=True)).item()
+        )
         == "nan"
     )
 

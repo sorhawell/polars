@@ -26,6 +26,7 @@ polars-time = { version = "0.27.2", path = "../polars-time", optional = true }
 polars-utils = { version = "0.27.2", path = "../polars-utils" }
 pyo3 = { version = "0.18", optional = true }
 rayon.workspace = true
+smartstring.workspace = true
 
 [features]
 nightly = ["polars-core/nightly", "polars-pipe/nightly"]
@@ -51,14 +52,13 @@ dtype-u8 = ["polars-plan/dtype-u8", "polars-pipe/dtype-u8"]
 dtype-u16 = ["polars-plan/dtype-u16", "polars-pipe/dtype-u16"]
 dtype-i8 = ["polars-plan/dtype-i8", "polars-pipe/dtype-i8"]
 dtype-i16 = ["polars-plan/dtype-i16", "polars-pipe/dtype-i16"]
-dtype-i128 = ["polars-plan/dtype-i128", "polars-pipe/dtype-i128"]
+dtype-decimal = ["polars-plan/dtype-decimal", "polars-pipe/dtype-decimal"]
 dtype-date = ["polars-plan/dtype-date", "polars-time/dtype-date", "temporal"]
 dtype-datetime = ["polars-plan/dtype-datetime", "polars-time/dtype-datetime", "temporal"]
 dtype-duration = ["polars-plan/dtype-duration", "polars-time/dtype-duration", "temporal"]
 dtype-time = ["polars-core/dtype-time", "temporal"]
 dtype-categorical = ["polars-plan/dtype-categorical", "polars-pipe/dtype-categorical"]
 dtype-struct = ["polars-plan/dtype-struct"]
-dtype-binary = ["polars-plan/dtype-binary"]
 object = ["polars-plan/object"]
 date_offset = ["polars-plan/date_offset"]
 trigonometry = ["polars-plan/trigonometry"]
@@ -127,7 +127,7 @@ serde = [
   "polars-ops/serde",
 ]
 
-binary_encoding = ["polars-plan/binary_encoding", "dtype-binary"]
+binary_encoding = ["polars-plan/binary_encoding"]
 
 # no guarantees whatsoever
 private = ["polars-plan/private"]

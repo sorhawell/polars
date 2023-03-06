@@ -15,13 +15,12 @@ pub enum DataType {
     Int64,
     Float32,
     Float64,
-    #[cfg(feature = "dtype-i128")]
-    /// Fixed point decimal type with precision and scale.
-    /// This is backed by 128 bits which allows for 38 significant digits.
-    Decimal128(Option<(usize, usize)>),
+    #[cfg(feature = "dtype-decimal")]
+    /// Fixed point decimal type optional precision and non-negative scale.
+    /// This is backed by a signed 128-bit integer which allows for up to 38 significant digits.
+    Decimal(Option<usize>, Option<usize>), // prec/scale; scale being None means "infer"
     /// String data
     Utf8,
-    #[cfg(feature = "dtype-binary")]
     Binary,
     /// A 32-bit date representing the elapsed time since UNIX epoch (1970-01-01)
     /// in days (32 bits).
@@ -136,16 +135,7 @@ impl DataType {
     /// Check if datatype is a primitive type. By that we mean that
     /// it is not a container type.
     pub fn is_primitive(&self) -> bool {
-        #[cfg(feature = "dtype-binary")]
-        {
-            self.is_numeric()
-                | matches!(self, DataType::Boolean | DataType::Utf8 | DataType::Binary)
-        }
-
-        #[cfg(not(feature = "dtype-binary"))]
-        {
-            self.is_numeric() | matches!(self, DataType::Boolean | DataType::Utf8)
-        }
+        self.is_numeric() | matches!(self, DataType::Boolean | DataType::Utf8 | DataType::Binary)
     }
 
     /// Check if this [`DataType`] is a numeric type
@@ -161,7 +151,6 @@ impl DataType {
             | DataType::Boolean
             | DataType::Unknown
             | DataType::Null => false,
-            #[cfg(feature = "dtype-binary")]
             DataType::Binary => false,
             #[cfg(feature = "object")]
             DataType::Object(_) => false,
@@ -213,10 +202,13 @@ impl DataType {
             Int64 => ArrowDataType::Int64,
             Float32 => ArrowDataType::Float32,
             Float64 => ArrowDataType::Float64,
-            #[cfg(feature = "dtype-i128")]
-            Decimal128(_) => todo!(),
+            #[cfg(feature = "dtype-decimal")]
+            // note: what else can we do here other than setting prec to 38?..
+            Decimal(prec, scale) => ArrowDataType::Decimal(
+                (*prec).unwrap_or(38),
+                scale.unwrap_or(0), // and what else can we do here?
+            ),
             Utf8 => ArrowDataType::LargeUtf8,
-            #[cfg(feature = "dtype-binary")]
             Binary => ArrowDataType::LargeBinary,
             Date => ArrowDataType::Date32,
             Datetime(unit, tz) => ArrowDataType::Timestamp(unit.to_arrow(), tz.clone()),
@@ -268,10 +260,15 @@ impl Display for DataType {
             DataType::Int64 => "i64",
             DataType::Float32 => "f32",
             DataType::Float64 => "f64",
-            #[cfg(feature = "dtype-i128")]
-            DataType::Decimal128(_) => "i128",
+            #[cfg(feature = "dtype-decimal")]
+            DataType::Decimal(prec, scale) => {
+                return match (prec, scale) {
+                    (_, None) => f.write_str("decimal[?]"), // shouldn't happen
+                    (None, Some(scale)) => f.write_str(&format!("decimal[{scale}]")),
+                    (Some(prec), Some(scale)) => f.write_str(&format!("decimal[.{prec},{scale}]")),
+                };
+            }
             DataType::Utf8 => "str",
-            #[cfg(feature = "dtype-binary")]
             DataType::Binary => "binary",
             DataType::Date => "date",
             DataType::Datetime(tu, tz) => {

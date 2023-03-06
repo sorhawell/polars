@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import math
 import os
 import random
@@ -18,7 +19,6 @@ from typing import (
 
 from polars import internals as pli
 from polars.datatypes import (
-    PolarsDataType,
     Struct,
     UInt32,
     is_polars_dtype,
@@ -38,12 +38,18 @@ from polars.utils import (
     deprecate_nonkeyword_arguments,
     deprecated_alias,
     sphinx_accessor,
+    threadpool_size,
 )
+
+with contextlib.suppress(ImportError):  # Module not available when building docs
+    from polars.polars import arg_where as py_arg_where
 
 if TYPE_CHECKING:
     import sys
 
+    from polars.datatypes import PolarsDataType
     from polars.internals.type_aliases import (
+        ApplyStrategy,
         ClosedInterval,
         FillNullStrategy,
         InterpolationMethod,
@@ -147,7 +153,7 @@ def expr_to_lit_or_expr(
         unaliased_expr = expr.meta.undo_aliases()
         if unaliased_expr.meta.has_multiple_outputs():
             expr_name = expr_output_name(expr)
-            expr = cast(Expr, pli.struct(expr if expr_name is None else unaliased_expr))
+            expr = pli.struct(expr if expr_name is None else unaliased_expr)
             name = name or expr_name
 
     return expr if name is None else expr.alias(name)
@@ -417,6 +423,37 @@ class Expr:
 
         """
         return self._from_pyexpr(self._pyexpr.all())
+
+    def arg_true(self) -> Self:
+        """
+        Return indices where expression evaluates `True`.
+
+        .. warning::
+            Modifies number of rows returned, so will fail in combination with other
+            expressions. Use as only expression in `select` / `with_columns`.
+
+        Examples
+        --------
+        >>> df = pl.DataFrame({"a": [1, 1, 2, 1]})
+        >>> df.select((pl.col("a") == 1).arg_true())
+        shape: (3, 1)
+        ┌─────┐
+        │ a   │
+        │ --- │
+        │ u32 │
+        ╞═════╡
+        │ 0   │
+        │ 1   │
+        │ 3   │
+        └─────┘
+
+        See Also
+        --------
+        Series.arg_true : Return indices where Series is True
+        pl.arg_where
+
+        """
+        return self._from_pyexpr(py_arg_where(self._pyexpr))
 
     def sqrt(self) -> Self:
         """
@@ -3217,6 +3254,8 @@ class Expr:
         return_dtype: PolarsDataType | None = None,
         skip_nulls: bool = True,
         pass_name: bool = False,
+        *,
+        strategy: ApplyStrategy = "thread_local",
     ) -> Self:
         """
         Apply a custom/user-defined function (UDF) in a GroupBy or Projection context.
@@ -3230,15 +3269,10 @@ class Expr:
             Expects `f` to be of type Callable[[Series], Series].
             Applies a python function over each group.
 
-        Implementing logic using a Python function is almost always _significantly_
-        slower and more memory intensive than implementing the same logic using
-        the native expression API because:
-
-        - The native expression engine runs in Rust; UDFs run in Python.
-        - Use of Python UDFs forces the DataFrame to be materialized in memory.
-        - Polars-native expressions can be parallelised (UDFs cannot).
-        - Polars-native expressions can be logically optimised (UDFs cannot).
-
+        Notes
+        -----
+        Using ``apply`` is strongly discouraged as you will be effectively running
+        python for loops. This will be very slow.
         Wherever possible you should strongly prefer the native expression API
         to achieve the best performance.
 
@@ -3256,6 +3290,16 @@ class Expr:
         pass_name
             Pass the Series name to the custom function
             This is more expensive.
+        strategy : {'thread_local', 'threading'}
+            This functionality is in `alpha` stage. This may be removed
+            /changed without it being considdered a breaking change.
+
+            - 'thread_local': run the python function on a single thread.
+            - 'threading': run the python function on separate threads. Use with
+                        care as this can slow performance. This might only speed up
+                        your code if the amount of work per element is significant
+                        and the python function releases the GIL (e.g. via calling
+                        a c function)
 
         Examples
         --------
@@ -3322,8 +3366,6 @@ class Expr:
 
                 return x.apply(inner, return_dtype=return_dtype, skip_nulls=skip_nulls)
 
-            return self.map(wrap_f, agg_list=True, return_dtype=return_dtype)
-
         else:
 
             def wrap_f(x: pli.Series) -> pli.Series:  # pragma: no cover
@@ -3331,7 +3373,47 @@ class Expr:
                     function, return_dtype=return_dtype, skip_nulls=skip_nulls
                 )
 
+        if strategy == "thread_local":
             return self.map(wrap_f, agg_list=True, return_dtype=return_dtype)
+        elif strategy == "threading":
+
+            def wrap_threading(x: pli.Series) -> pli.Series:
+                df = x.to_frame("x")
+
+                n_threads = threadpool_size()
+                chunk_size = x.len() // n_threads
+                remainder = x.len() % n_threads
+                if chunk_size == 0:
+                    chunk_sizes = [1 for _ in range(remainder)]
+                else:
+                    chunk_sizes = [
+                        chunk_size + 1 if i < remainder else chunk_size
+                        for i in range(n_threads)
+                    ]
+
+                def get_lazy_promise(df: pli.DataFrame) -> pli.LazyFrame:
+                    return df.lazy().select(
+                        pli.col("x").map(
+                            wrap_f, agg_list=True, return_dtype=return_dtype
+                        )
+                    )
+
+                # create partitions with LazyFrames
+                # these are promises on a computation
+                partitions = []
+                b = 0
+                for step in chunk_sizes:
+                    a = b
+                    b = b + step
+                    partition_df = df[a:b]
+                    partitions.append(get_lazy_promise(partition_df))
+
+                out = [df.to_series() for df in pli.collect_all(partitions)]
+                return pli.concat(out, rechunk=False)
+
+            return self.map(wrap_threading, agg_list=True, return_dtype=return_dtype)
+        else:
+            ValueError(f"Strategy {strategy} is not supported.")
 
     def flatten(self) -> Self:
         """
@@ -6355,8 +6437,9 @@ class Expr:
             #   - one column DataFrame in other cases.
             df = s.to_frame().unnest(s.name) if s.dtype == Struct else s.to_frame()
 
+            # For struct we always apply mapping to the first column
             column = df.columns[0]
-            input_dtype = df.select(column).dtypes[0]
+            input_dtype = df.dtypes[0]
             remap_key_column = f"__POLARS_REMAP_KEY_{column}"
             remap_value_column = f"__POLARS_REMAP_VALUE_{column}"
             is_remapped_column = f"__POLARS_REMAP_IS_REMAPPED_{column}"

@@ -25,7 +25,7 @@ version = "0.27.2"
 [workspace.dependencies]
 rayon = "1.6"
 thiserror = "^1"
-num = "0.4"
+num-traits = "0.2"
 ahash = "0.8"
 xxhash-rust = { version = "0.8.6", features = ["xxh3"] }
 # todo! remove
@@ -33,6 +33,8 @@ anyhow = "1"
 hashbrown = { version = "0.13.1", features = ["rayon", "ahash"] }
 bitflags = "1.3"
 once_cell = "1"
+memchr = "2"
+smartstring = { version = "1" }
 
 [workspace.dependencies.arrow]
 package = "arrow2"
@@ -40,7 +42,7 @@ package = "arrow2"
 git = "https://github.com/ritchie46/arrow2"
 # rev = "7be484eb530805696c1ab79aae809f973d92cd5a"
 # path = "../arrow2"
-branch = "polars_2023-02-22"
+branch = "polars_2023-03-01"
 version = "0.16"
 default-features = false
 features = [

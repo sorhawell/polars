@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from functools import reduce
+from inspect import signature
 from operator import add
 from string import ascii_letters
 from typing import TYPE_CHECKING, Any, cast
@@ -11,12 +12,19 @@ import pytest
 
 import polars as pl
 from polars import lit, when
-from polars.datatypes import NUMERIC_DTYPES, PolarsDataType
+from polars.datatypes import NUMERIC_DTYPES
 from polars.testing import assert_frame_equal
 from polars.testing.asserts import assert_series_equal
 
 if TYPE_CHECKING:
     from _pytest.capture import CaptureFixture
+
+
+def test_init_signature_match() -> None:
+    # eager/lazy init signatures are expected to match; if this test fails, it
+    # means a parameter was added to one but not the other, and that should be
+    # fixed (or an explicit exemption should be made here, with an explanation)
+    assert signature(pl.DataFrame.__init__) == signature(pl.LazyFrame.__init__)
 
 
 def test_lazy() -> None:
@@ -64,6 +72,15 @@ def test_apply() -> None:
     expected = ldf.clone().with_columns((pl.col("a") * 2).alias("foo"))
     assert_frame_equal(new, expected)
     assert_frame_equal(new.collect(), expected.collect())
+
+    for strategy in ["thread_local", "threading"]:
+        ldf = pl.LazyFrame({"a": [1, 2, 3] * 20, "b": [1.0, 2.0, 3.0] * 20})
+        new = ldf.with_columns(
+            pl.col("a").apply(lambda s: s * 2, strategy=strategy).alias("foo")  # type: ignore[arg-type]
+        )
+
+        expected = ldf.clone().with_columns((pl.col("a") * 2).alias("foo"))
+        assert_frame_equal(new.collect(), expected.collect())
 
 
 def test_add_eager_column() -> None:
@@ -330,8 +347,8 @@ def test_when_then_flatten() -> None:
 
 
 def test_describe_plan() -> None:
-    assert isinstance(pl.LazyFrame({"a": [1]}).describe_optimized_plan(), str)
-    assert isinstance(pl.LazyFrame({"a": [1]}).describe_plan(), str)
+    assert isinstance(pl.LazyFrame({"a": [1]}).explain(optimized=True), str)
+    assert isinstance(pl.LazyFrame({"a": [1]}).explain(optimized=False), str)
 
 
 def test_inspect(capsys: CaptureFixture[str]) -> None:
@@ -353,7 +370,7 @@ def test_fetch(fruits_cars: pl.DataFrame) -> None:
 def test_concat_str() -> None:
     ldf = pl.LazyFrame({"a": ["a", "b", "c"], "b": [1, 2, 3]})
 
-    out = ldf.select([pl.concat_str(["a", "b"], sep="-")])
+    out = ldf.select([pl.concat_str(["a", "b"], separator="-")])
     assert out.collect()["a"].to_list() == ["a-1", "b-2", "c-3"]
 
     out = ldf.select([pl.format("foo_{}_bar_{}", pl.col("a"), "b").alias("fmt")])
@@ -999,7 +1016,9 @@ def test_spearman_corr() -> None:
 
     out = (
         ldf.groupby("era", maintain_order=True).agg(
-            pl.spearman_rank_corr(pl.col("prediction"), pl.col("target")).alias("c"),
+            pl.corr(pl.col("prediction"), pl.col("target"), method="spearman").alias(
+                "c"
+            ),
         )
     ).collect()["c"]
     assert np.isclose(out[0], 0.5)
@@ -1008,7 +1027,7 @@ def test_spearman_corr() -> None:
     # we can also pass in column names directly
     out = (
         ldf.groupby("era", maintain_order=True).agg(
-            pl.spearman_rank_corr("prediction", "target").alias("c"),
+            pl.corr("prediction", "target", method="spearman").alias("c"),
         )
     ).collect()["c"]
     assert np.isclose(out[0], 0.5)
@@ -1026,7 +1045,9 @@ def test_pearson_corr() -> None:
 
     out = (
         ldf.groupby("era", maintain_order=True).agg(
-            pl.pearson_corr(pl.col("prediction"), pl.col("target")).alias("c"),
+            pl.corr(pl.col("prediction"), pl.col("target"), method="pearson").alias(
+                "c"
+            ),
         )
     ).collect()["c"]
     assert out.to_list() == pytest.approx([0.6546536707079772, -5.477514993831792e-1])
@@ -1034,7 +1055,7 @@ def test_pearson_corr() -> None:
     # we can also pass in column names directly
     out = (
         ldf.groupby("era", maintain_order=True).agg(
-            pl.pearson_corr("prediction", "target").alias("c"),
+            pl.corr("prediction", "target", method="pearson").alias("c"),
         )
     ).collect()["c"]
     assert out.to_list() == pytest.approx([0.6546536707079772, -5.477514993831792e-1])
@@ -1319,7 +1340,7 @@ def test_quadratic_behavior_4736() -> None:
 
 
 @pytest.mark.parametrize("input_dtype", [pl.Utf8, pl.Int64, pl.Float64])
-def test_from_epoch(input_dtype: PolarsDataType) -> None:
+def test_from_epoch(input_dtype: pl.PolarsDataType) -> None:
     ldf = pl.LazyFrame(
         [
             pl.Series("timestamp_d", [13285]).cast(input_dtype),
@@ -1440,6 +1461,7 @@ def test_compare_schema_between_lazy_and_eager_6904() -> None:
         pl.col("x").arg_min(),
         pl.col("x").max(),
         pl.col("x").mean(),
+        pl.col("x").median(),
         pl.col("x").min(),
         pl.col("x").nan_max(),
         pl.col("x").nan_min(),

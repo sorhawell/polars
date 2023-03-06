@@ -448,3 +448,38 @@ def test_file_path_truncate_err() -> None:
         match=r"\.\.\.42jfdksl32jfdksl22jfdksl12jfdksl02jfdksl91jfdksl81jfdksl71jfdksl61jfdksl51jfdksl41jfdksl",
     ):
         pl.read_csv(content)
+
+
+def test_ambiguous_filter_err() -> None:
+    df = pl.DataFrame({"a": [None, "2", "3"], "b": [None, None, "z"]})
+    with pytest.raises(
+        pl.ComputeError,
+        match=r"The predicate passed to 'LazyFrame.filter' expanded to multiple expressions",
+    ):
+        df.filter(pl.col(["a", "b"]).is_null())
+
+
+def test_with_column_duplicates() -> None:
+    df = pl.DataFrame({"a": [0, None, 2, 3, None], "b": [None, 1, 2, 3, None]})
+    with pytest.raises(
+        pl.ComputeError,
+        match=r"The name: 'same' passed to `LazyFrame.with_columns` is duplicate",
+    ):
+        assert df.with_columns([pl.all().alias("same")]).columns == ["a", "b", "same"]
+
+
+def test_skipp_nulls_err() -> None:
+    df = pl.DataFrame({"foo": [None, None]})
+
+    with pytest.raises(
+        pl.ComputeError, match=r"The output type of 'apply' function cannot determined"
+    ):
+        df.with_columns(pl.col("foo").apply(lambda x: x, skip_nulls=True))
+
+
+def test_err_on_time_datetime_cast() -> None:
+    s = pl.Series([time(10, 0, 0), time(11, 30, 59)])
+    with pytest.raises(
+        pl.ComputeError, match=r"Cannot cast dtype: 'Time' to dtype: 'Datetime'"
+    ):
+        s.cast(pl.Datetime)

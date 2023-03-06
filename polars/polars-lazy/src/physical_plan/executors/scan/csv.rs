@@ -28,7 +28,7 @@ impl CsvExec {
         CsvReader::from_path(&self.path)
             .unwrap()
             .has_header(self.options.has_header)
-            .with_schema(&self.schema)
+            .with_dtypes(Some(self.schema.clone()))
             .with_delimiter(self.options.delimiter)
             .with_ignore_errors(self.options.ignore_errors)
             .with_skip_rows(self.options.skip_rows)
@@ -61,9 +61,9 @@ impl Executor for CsvExec {
         };
 
         let profile_name = if state.has_node_timer() {
-            let mut ids = vec![self.path.to_string_lossy().to_string()];
+            let mut ids = vec![self.path.to_string_lossy().into()];
             if self.predicate.is_some() {
-                ids.push("predicate".to_string())
+                ids.push("predicate".into())
             }
             let name = column_delimited("csv".to_string(), &ids);
             Cow::Owned(name)

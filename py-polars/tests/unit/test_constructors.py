@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import typing
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from decimal import Decimal
 from random import shuffle
 from typing import Any
@@ -135,7 +135,7 @@ def test_init_dataclasses_and_namedtuple() -> None:
             assert df.schema == {
                 "timestamp": pl.Datetime("us"),
                 "ticker": pl.Utf8,
-                "price": pl.Float64,
+                "price": pl.Decimal(None, 1),
                 "size": pl.Int64,
             }
             assert df.rows() == raw_data
@@ -148,7 +148,7 @@ def test_init_dataclasses_and_namedtuple() -> None:
             assert df.schema == {
                 "timestamp": pl.Datetime("ms"),
                 "ticker": pl.Utf8,
-                "price": pl.Float64,
+                "price": pl.Decimal(None, 1),
                 "size": pl.Int32,
             }
 
@@ -158,14 +158,14 @@ def test_init_dataclasses_and_namedtuple() -> None:
             schema=[
                 ("ts", pl.Datetime("ms")),
                 ("tk", pl.Categorical),
-                ("pc", pl.Float32),
+                ("pc", pl.Decimal(None, 1)),
                 ("sz", pl.UInt16),
             ],
         )
         assert df.schema == {
             "ts": pl.Datetime("ms"),
             "tk": pl.Categorical,
-            "pc": pl.Float32,
+            "pc": pl.Decimal(None, 1),
             "sz": pl.UInt16,
         }
         assert df.rows() == raw_data
@@ -429,6 +429,14 @@ def test_init_1d_sequence() -> None:
 
     # String sequence
     assert pl.DataFrame("abc", schema=["s"]).to_dict(False) == {"s": ["a", "b", "c"]}
+
+    # datetimes sequence
+    df = pl.DataFrame([datetime(2020, 1, 1)], schema={"ts": pl.Datetime("ms")})
+    assert df.schema == {"ts": pl.Datetime("ms")}
+    df = pl.DataFrame(
+        [datetime(2020, 1, 1, tzinfo=timezone.utc)], schema={"ts": pl.Datetime("ms")}
+    )
+    assert df.schema == {"ts": pl.Datetime("ms", "UTC")}
 
 
 def test_init_pandas(monkeypatch: Any) -> None:
@@ -915,3 +923,13 @@ def test_array_to_pyseries_with_one_chunk_does_not_copy_data() -> None:
         pyseries.get_chunks()[0]._get_ptr()
         == original_array.chunks[0].buffers()[1].address
     )
+
+
+def test_init_with_explicit_binary_schema() -> None:
+    df = pl.DataFrame({"a": [b"hello", b"world"]}, schema={"a": pl.Binary})
+    assert df.schema == {"a": pl.Binary}
+    assert df["a"].to_list() == [b"hello", b"world"]
+
+    s = pl.Series("a", [b"hello", b"world"], dtype=pl.Binary)
+    assert s.dtype == pl.Binary
+    assert s.to_list() == [b"hello", b"world"]

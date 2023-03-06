@@ -62,19 +62,16 @@ impl Series {
             Datetime(tu, tz) => Int64Chunked::from_chunks(name, chunks)
                 .into_datetime(*tu, tz.clone())
                 .into_series(),
+            #[cfg(feature = "dtype-decimal")]
+            Decimal(prec, scale) => Int128Chunked::from_chunks(name, chunks)
+                .into_decimal_unchecked(
+                    *prec,
+                    scale.unwrap_or_else(|| unreachable!("scale should be set")),
+                )
+                .into_series(),
             List(_) => ListChunked::from_chunks(name, chunks).cast(dtype).unwrap(),
             Utf8 => Utf8Chunked::from_chunks(name, chunks).into_series(),
-            #[cfg(feature = "dtype-binary")]
-            Binary => {
-                #[cfg(feature = "dtype-binary")]
-                {
-                    BinaryChunked::from_chunks(name, chunks).into_series()
-                }
-                #[cfg(not(feature = "dtype-binary"))]
-                {
-                    panic!("activate feature 'dtype-binary'")
-                }
-            }
+            Binary => BinaryChunked::from_chunks(name, chunks).into_series(),
             #[cfg(feature = "dtype-categorical")]
             Categorical(rev_map) => {
                 let cats = UInt32Chunked::from_chunks(name, chunks);
@@ -109,38 +106,12 @@ impl Series {
                 let chunks = cast_chunks(&chunks, &DataType::Utf8, false).unwrap();
                 Ok(Utf8Chunked::from_chunks(name, chunks).into_series())
             }
-            #[cfg(feature = "dtype-binary")]
             ArrowDataType::LargeBinary => {
                 Ok(BinaryChunked::from_chunks(name, chunks).into_series())
             }
-            #[cfg(feature = "dtype-binary")]
             ArrowDataType::Binary => {
                 let chunks = cast_chunks(&chunks, &DataType::Binary, false).unwrap();
                 Ok(BinaryChunked::from_chunks(name, chunks).into_series())
-            }
-            #[cfg(all(feature = "dtype-u8", not(feature = "dtype-binary")))]
-            ArrowDataType::LargeBinary | ArrowDataType::Binary => {
-                let chunks = chunks
-                    .iter()
-                    .map(|arr| {
-                        let arr = cast(&**arr, &ArrowDataType::LargeBinary).unwrap();
-
-                        let arr = arr.as_any().downcast_ref::<BinaryArray<i64>>().unwrap();
-                        let values = arr.values().clone();
-                        let offsets = arr.offsets().clone();
-                        let validity = arr.validity().cloned();
-
-                        let values =
-                            Box::new(PrimitiveArray::new(ArrowDataType::UInt8, values, None));
-
-                        let dtype = ListArray::<i64>::default_datatype(ArrowDataType::UInt8);
-                        // Safety:
-                        // offsets are monotonically increasing
-                        Box::new(ListArray::<i64>::new(dtype, offsets, values, validity))
-                            as ArrayRef
-                    })
-                    .collect();
-                Ok(ListChunked::from_chunks(name, chunks).into())
             }
             ArrowDataType::List(_) | ArrowDataType::LargeList(_) => {
                 let chunks = chunks.iter().map(convert_inner_types).collect();
@@ -364,22 +335,49 @@ impl Series {
                 Ok(StructChunked::new_unchecked(name, &fields).into_series())
             }
             ArrowDataType::FixedSizeBinary(_) => {
-                #[cfg(feature = "dtype-binary")]
-                {
-                    if verbose() {
-                        eprintln!(
-                            "Polars does not support decimal types so the 'Series' are read as Float64"
-                        );
-                    }
-                    let chunks = cast_chunks(&chunks, &DataType::Binary, true)?;
-                    Ok(BinaryChunked::from_chunks(name, chunks).into_series())
+                if verbose() {
+                    eprintln!(
+                        "Polars does not support decimal types so the 'Series' are read as Float64"
+                    );
                 }
-                #[cfg(not(feature = "dtype-binary"))]
+                let chunks = cast_chunks(&chunks, &DataType::Binary, true)?;
+                Ok(BinaryChunked::from_chunks(name, chunks).into_series())
+            }
+            #[cfg(feature = "dtype-decimal")]
+            ArrowDataType::Decimal(prec, scale) => {
+                #[cfg(feature = "python")]
                 {
-                    panic!("activate 'dtype-binary' feature")
+                    if std::env::var("POLARS_ACTIVATE_DECIMAL").is_ok() {
+                        Ok(Int128Chunked::from_chunks(name, chunks)
+                            .into_decimal_unchecked(Some(*prec), *scale)
+                            .into_series())
+                    } else {
+                        if verbose() {
+                            eprintln!(
+                                "Activate beta decimal types to read as decimal. Current behavior casts to Float64."
+                            );
+                        }
+                        Ok(Float64Chunked::from_chunks(
+                            name,
+                            cast_chunks(&chunks, &DataType::Float64, true).unwrap(),
+                        )
+                        .into_series())
+                    }
+                }
+
+                #[cfg(not(feature = "python"))]
+                {
+                    let (prec, scale) = (Some(*prec), *scale);
+                    let chunks =
+                        cast_chunks(&chunks, &DataType::Decimal(prec, Some(scale)), false).unwrap();
+                    // or DecimalChunked?
+                    Ok(Int128Chunked::from_chunks(name, chunks)
+                        .into_decimal_unchecked(prec, scale)
+                        .into_series())
                 }
             }
-            ArrowDataType::Decimal(_, _) | ArrowDataType::Decimal256(_, _) => {
+            #[allow(unreachable_patterns)]
+            ArrowDataType::Decimal256(_, _) | ArrowDataType::Decimal(_, _) => {
                 if verbose() {
                     eprintln!(
                         "Polars does not support decimal types so the 'Series' are read as Float64"
@@ -430,7 +428,6 @@ fn convert_inner_types(arr: &ArrayRef) -> ArrayRef {
             let out = cast(&**arr, &ArrowDataType::LargeList(field.clone())).unwrap();
             convert_inner_types(&out)
         }
-        #[cfg(feature = "dtype-binary")]
         ArrowDataType::FixedSizeBinary(_) | ArrowDataType::Binary => {
             let out = cast(&**arr, &ArrowDataType::LargeBinary).unwrap();
             convert_inner_types(&out)
@@ -579,20 +576,4 @@ unsafe impl IntoSeries for Series {
 fn new_null(name: &str, chunks: &[ArrayRef]) -> Series {
     let len = chunks.iter().map(|arr| arr.len()).sum();
     Series::new_null(name, len)
-}
-
-#[cfg(test)]
-mod test {
-    #[cfg(all(feature = "dtype-u8", not(feature = "dtype-binary")))]
-    use super::*;
-
-    #[test]
-    #[cfg(all(feature = "dtype-u8", not(feature = "dtype-binary")))]
-    fn test_binary_to_list() {
-        let iter = std::iter::repeat(b"hello").take(2).map(Some);
-        let a = Box::new(iter.collect::<BinaryArray<i32>>()) as ArrayRef;
-
-        let s = Series::try_from(("", a)).unwrap();
-        assert_eq!(s.dtype(), &DataType::List(Box::new(DataType::UInt8)));
-    }
 }

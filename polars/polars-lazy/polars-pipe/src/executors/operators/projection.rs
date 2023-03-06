@@ -9,7 +9,7 @@ use crate::operators::{DataChunk, Operator, OperatorResult, PExecutionContext};
 
 #[derive(Clone)]
 pub(crate) struct FastProjectionOperator {
-    pub(crate) columns: Arc<Vec<Arc<str>>>,
+    pub(crate) columns: Arc<[Arc<str>]>,
 }
 
 impl Operator for FastProjectionOperator {
@@ -18,7 +18,7 @@ impl Operator for FastProjectionOperator {
         _context: &PExecutionContext,
         chunk: &DataChunk,
     ) -> PolarsResult<OperatorResult> {
-        let chunk = chunk.with_data(chunk.data.select(self.columns.as_slice())?);
+        let chunk = chunk.with_data(chunk.data.select(self.columns.as_ref())?);
         Ok(OperatorResult::Finished(chunk))
     }
     fn split(&self, _thread_no: usize) -> Box<dyn Operator> {
@@ -59,7 +59,7 @@ impl Operator for ProjectionOperator {
 
         if has_empty {
             for s in &mut projected {
-                *s = s.slice(0, 0);
+                *s = s.clear();
             }
         } else if has_literals {
             let height = projected.iter().map(|s| s.len()).max().unwrap();

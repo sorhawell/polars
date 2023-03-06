@@ -52,8 +52,9 @@ xlsx2csv = ["xlsx2csv >= 0.8.0"]
 deltalake = ["deltalake >= 0.6.2"]
 timezone = ["backports.zoneinfo; python_version < '3.9'", "tzdata; platform_system == 'Windows'"]
 matplotlib = ["matplotlib"]
+sqlalchemy = ["sqlalchemy", "pandas"]
 all = [
-  "polars[pyarrow,pandas,numpy,fsspec,connectorx,xlsx2csv,deltalake,timezone,matplotlib]",
+  "polars[pyarrow,pandas,numpy,fsspec,connectorx,xlsx2csv,deltalake,timezone,matplotlib,sqlalchemy]",
 ]
 
 [tool.mypy]
@@ -78,7 +79,12 @@ module = [
   "connectorx",
   "deltalake",
   "IPython.*",
+  "xlsx2csv",
+  "xlsxwriter",
+  "xlsxwriter.utility",
+  "xlsxwriter.worksheet",
   "zoneinfo",
+  "sqlalchemy",
 ]
 ignore_missing_imports = true
 
@@ -152,6 +158,9 @@ max-doc-length = 88
 [tool.ruff.flake8-tidy-imports]
 ban-relative-imports = "all"
 
+[tool.ruff.flake8-type-checking]
+strict = true
+
 [tool.ruff.per-file-ignores]
 "polars/datatypes.py" = ["B019"]
 "tests/**/*.py" = ["D100", "D103"]
@@ -162,9 +171,10 @@ addopts = [
   "--strict-markers",
   "--import-mode=importlib",
   # Default to running fast tests only. To run ALL tests, run: pytest -m ""
-  "-m not slow and not hypothesis and not benchmark",
+  "-m not slow and not hypothesis and not benchmark and not write_disk",
 ]
 markers = [
+  "write_disk: Tests that write to disk",
   "slow: Tests with a longer than average runtime.",
   "benchmark: Tests that should be run on a Polars release build.",
 ]

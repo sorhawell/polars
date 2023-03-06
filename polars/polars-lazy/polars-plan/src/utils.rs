@@ -3,6 +3,7 @@ use std::iter::FlatMap;
 use std::sync::Arc;
 
 use polars_core::prelude::*;
+use smartstring::alias::String as SmartString;
 
 use crate::logical_plan::iterator::ArenaExprIter;
 use crate::logical_plan::Context;
@@ -10,7 +11,7 @@ use crate::prelude::names::COUNT;
 use crate::prelude::*;
 
 /// Utility to write comma delimited
-pub fn column_delimited(mut s: String, items: &[String]) -> String {
+pub fn column_delimited(mut s: String, items: &[SmartString]) -> String {
     s.push('(');
     for c in items {
         s.push_str(c);
@@ -345,6 +346,10 @@ pub fn aexpr_to_leaf_names_iter(
 
 pub fn aexpr_to_leaf_names(node: Node, arena: &Arena<AExpr>) -> Vec<Arc<str>> {
     aexpr_to_leaf_names_iter(node, arena).collect()
+}
+
+pub fn aexpr_to_leaf_name(node: Node, arena: &Arena<AExpr>) -> Arc<str> {
+    aexpr_to_leaf_names_iter(node, arena).next().unwrap()
 }
 
 /// check if a selection/projection can be done on the downwards schema

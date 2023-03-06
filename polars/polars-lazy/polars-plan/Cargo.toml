@@ -22,6 +22,7 @@ pyo3 = { version = "0.18", optional = true }
 rayon.workspace = true
 regex = { version = "1.6", optional = true }
 serde = { version = "1", features = ["derive", "rc"], optional = true }
+smartstring.workspace = true
 
 [features]
 # debuging utility
@@ -46,14 +47,13 @@ dtype-u8 = ["polars-core/dtype-u8"]
 dtype-u16 = ["polars-core/dtype-u16"]
 dtype-i8 = ["polars-core/dtype-i8"]
 dtype-i16 = ["polars-core/dtype-i16"]
-dtype-i128 = ["polars-core/dtype-i128"]
+dtype-decimal = ["polars-core/dtype-decimal"]
 dtype-date = ["polars-core/dtype-date", "polars-time/dtype-date", "temporal"]
 dtype-datetime = ["polars-core/dtype-datetime", "polars-time/dtype-datetime", "temporal"]
 dtype-duration = ["polars-core/dtype-duration", "polars-time/dtype-duration", "temporal"]
 dtype-time = ["polars-core/dtype-time", "polars-time/dtype-time"]
 dtype-categorical = ["polars-core/dtype-categorical"]
 dtype-struct = ["polars-core/dtype-struct"]
-dtype-binary = ["polars-core/dtype-binary"]
 object = ["polars-core/object"]
 date_offset = ["polars-time"]
 list_take = ["polars-ops/list_take"]
@@ -61,7 +61,7 @@ list_count = ["polars-ops/list_count"]
 trigonometry = []
 sign = []
 timezones = ["polars-time/timezones", "polars-core/timezones", "regex"]
-binary_encoding = ["polars-ops/binary_encoding", "dtype-binary"]
+binary_encoding = ["polars-ops/binary_encoding"]
 true_div = []
 
 # operations

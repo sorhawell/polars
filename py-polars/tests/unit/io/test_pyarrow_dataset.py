@@ -17,10 +17,11 @@ def helper_dataset_test(file_path: Path, query) -> None:
     dset = ds.dataset(file_path, format="ipc")
 
     expected = query(pl.scan_ipc(file_path))
-    out = query(pl.scan_ds(dset))
+    out = query(pl.scan_pyarrow_dataset(dset))
     assert_frame_equal(out, expected)
 
 
+@pytest.mark.write_disk()
 @pytest.mark.xfail(sys.platform == "win32", reason="Does not work on Windows")
 def test_dataset(df: pl.DataFrame) -> None:
     with tempfile.TemporaryDirectory() as temp_dir:

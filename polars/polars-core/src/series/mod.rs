@@ -23,7 +23,7 @@ use ahash::RandomState;
 use arrow::compute::aggregate::estimated_bytes_size;
 pub use from::*;
 pub use iterator::SeriesIter;
-use num::NumCast;
+use num_traits::NumCast;
 use rayon::prelude::*;
 pub use series_trait::{IsSorted, *};
 
@@ -156,6 +156,10 @@ impl Series {
     /// Create a new empty Series
     pub fn new_empty(name: &str, dtype: &DataType) -> Series {
         Series::full_null(name, 0, dtype)
+    }
+
+    pub fn clear(&self) -> Series {
+        Series::new_empty(self.name(), self.dtype())
     }
 
     #[doc(hidden)]

@@ -7,7 +7,7 @@ import os
 import random
 import typing
 from collections.abc import Sized
-from io import BytesIO, IOBase, StringIO
+from io import BytesIO, StringIO
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -25,7 +25,6 @@ from typing import (
 )
 
 from polars import internals as pli
-from polars._html import NotebookFormatter
 from polars.datatypes import (
     FLOAT_DTYPES,
     INTEGER_DTYPES,
@@ -39,9 +38,6 @@ from polars.datatypes import (
     Int32,
     Int64,
     Object,
-    PolarsDataType,
-    SchemaDefinition,
-    SchemaDict,
     UInt8,
     UInt16,
     UInt32,
@@ -70,7 +66,16 @@ from polars.internals.construction import (
     sequence_to_pydf,
     series_to_pydf,
 )
+from polars.internals.dataframe._html import NotebookFormatter
 from polars.internals.dataframe.groupby import DynamicGroupBy, GroupBy, RollingGroupBy
+from polars.internals.io_excel import (
+    _xl_column_range,
+    _xl_inject_sparklines,
+    _xl_setup_table_columns,
+    _xl_setup_table_options,
+    _xl_setup_workbook,
+    _xl_unique_table_name,
+)
 from polars.internals.slice import PolarsSlice
 from polars.utils import (
     _prepare_row_count_args,
@@ -96,15 +101,25 @@ with contextlib.suppress(ImportError):  # Module not available when building doc
 if TYPE_CHECKING:
     import sys
     from datetime import timedelta
+    from io import IOBase
 
     from pyarrow.interchange.dataframe import _PyArrowDataFrame
+    from xlsxwriter import Workbook
 
+    from polars.datatypes import (
+        OneOrMoreDataTypes,
+        PolarsDataType,
+        SchemaDefinition,
+        SchemaDict,
+    )
     from polars.internals.type_aliases import (
         AsofJoinStrategy,
         AvroCompression,
         ClosedInterval,
         ComparisonOperator,
         CsvEncoding,
+        DbWriteEngine,
+        DbWriteMode,
         FillNullStrategy,
         FrameInitTypes,
         IntoExpr,
@@ -159,6 +174,7 @@ def wrap_df(df: PyDataFrame) -> DataFrame:
     {
         "cleared": "clear",
         "iterrows": "iter_rows",
+        "pearson_corr": "corr",
         "with_column": "with_columns",
     }
 )
@@ -2378,6 +2394,330 @@ class DataFrame:
 
         self._df.write_avro(file, compression)
 
+    def write_excel(
+        self,
+        workbook: Workbook | BytesIO | Path | str | None = None,
+        worksheet: str | None = None,
+        *,
+        position: tuple[int, int] | str = "A1",
+        table_style: str | dict[str, Any] | None = None,
+        table_name: str | None = None,
+        column_widths: dict[str, int] | None = None,
+        column_totals: dict[str, str] | Sequence[str] | bool | None = None,
+        column_formats: dict[str, str] | None = None,
+        conditional_formats: dict[str, str | dict[str, Any]] | None = None,
+        dtype_formats: dict[OneOrMoreDataTypes, str] | None = None,
+        sparklines: dict[str, Sequence[str] | dict[str, Any]] | None = None,
+        float_precision: int = 3,
+        has_header: bool = True,
+        autofilter: bool = True,
+        autofit: bool = False,
+        hidden_columns: Sequence[str] | None = None,
+        hide_gridlines: bool = False,
+    ) -> Workbook:
+        """
+        Write frame data to a table in an Excel workbook/worksheet.
+
+        Parameters
+        ----------
+        workbook
+            String name or path of the workbook to create, BytesIO object to write
+            into, or an open ``xlsxwriter.Workbook`` object that has not been closed.
+            If None, writes to a ``dataframe.xlsx`` workbook in the working directory.
+        worksheet
+            Name of target worksheet; if None, writes to "Sheet1" when creating a new
+            workbook (writing to an existing workbook requires a valid worksheet name).
+        position
+            Table position in Excel notation (eg: "A1"), or a (row,col) integer tuple.
+        table_style
+            A named Excel table style, such as "Table Style Medium 4", or a dictionary
+            of {"key":value,} containing one or more of the following keys:
+            "style", "first_column", "last_column", "banded_columns, "banded_rows".
+        table_name
+            Name of the output table object in the worksheet; can then be referred to
+            in the sheet by formulae/charts, or by subsequent ``xlsxwriter`` operations.
+        column_widths
+            A {colname:int,} dict that sets (or overrides if autofitting) column widths
+            in integer pixel units.
+        column_totals
+            Add a total row. If True, all numeric columns will have an associated total
+            using "sum". If given a list of colnames, only those listed will have a
+            total.  For more control, pass a {colname:funcname,} dict. Valid names are:
+            "average", "count_nums", "count", "max", "min", "std_dev", "sum", "var".
+        column_formats
+            A {colname:str,} dictionary for applying an Excel format string to the given
+            columns. Formats defined here (such as "dd/mm/yyyy", "0.00%", etc) will
+            override those defined in ``dtype_formats``.
+        conditional_formats
+            A {colname:str,} or {colname:dict,} dictionary defining conditional format
+            options for the specified columns. If supplying a string typename, should be
+            one of the valid ``xlsxwriter`` types such as "3_color_scale", "data_bar",
+            etc. If supplying a dictionary you have complete flexibility to apply any
+            ``xlsxwriter``-supported options, including icon sets, formulae, etc.
+        dtype_formats
+            A {dtype:str,} dictionary that sets the default Excel format for the given
+            dtype. (This is overridden on a per-column basis by ``column_formats``).
+            It is also valid to use dtype groups such as ``pl.FLOAT_DTYPES`` as the
+            dtype/format key, to simplify setting uniform int/float formats.
+        sparklines
+            A {colname:list,} or {colname:dict,} dictionary that defines one or more
+            sparklines to be written into a new column in the table. If passing a
+            list of colnames (used as the source of the sparkline data) the default
+            sparkline settings are used (eg: will be a line with no markers). For more
+            control an ``xlsxwriter``-compliant parameter dictionary can be supplied; in
+            this case three additional polars-specific keys are available: "columns",
+            "insert_before", and "insert_after". These allow you to define the source
+            columns and position the sparkline(s) with respect to other table columns.
+            If no position directive is given, sparklines are added to the end of the
+            table in the order in which they are defined (eg: to the far right).
+        float_precision
+            Default number of decimals displayed for floating point columns (note that
+            this is purely a formatting directive; the actual values are not rounded).
+        has_header
+            Indicate if the table should be created with a header row.
+        autofilter
+            If the table has headers, provide autofilter capability.
+        autofit
+            Calculate individual column widths from the data.
+        hidden_columns
+             A list of table columns to hide in the worksheet.
+        hide_gridlines
+            Do not display any gridlines on the output worksheet.
+
+        Notes
+        -----
+        Conditional formatting parameter dicts should provide xlsxwriter-compatible
+        definitions; polars will take care of how/where they are applied on the
+        worksheet with respect to the column position. For supported options, see:
+        https://xlsxwriter.readthedocs.io/working_with_conditional_formats.html
+
+        Similarly for sparklines, any parameter definition dictionary should contain
+        xlsxwriter-compatible key/values, as well as a mandatory polars "columns" key
+        that defines the sparkline source data; these source cols should be adjacent to
+        each other. Two other polars-specific keys are available to help define where
+        the sparkline appears in the table: "insert_after", and "insert_before". The
+        value associated with these keys should be the name of a column in the table.
+        https://xlsxwriter.readthedocs.io/working_with_sparklines.html
+
+        Examples
+        --------
+        Instantiate a basic dataframe:
+
+        >>> from random import uniform
+        >>> from datetime import date
+        >>>
+        >>> df = pl.DataFrame(
+        ...     {
+        ...         "dtm": [date(2023, 1, 1), date(2023, 1, 2), date(2023, 1, 3)],
+        ...         "num": [uniform(-500, 500), uniform(-500, 500), uniform(-500, 500)],
+        ...         "val": [10_000, 20_000, 30_000],
+        ...     }
+        ... )
+
+        Export to "dataframe.xlsx" (the default workbook name, if not specified) in the
+        working directory, add column totals ("sum") on all numeric columns, autofit:
+
+        >>> df.write_excel(column_totals=True, autofit=True)  # doctest: +SKIP
+
+        Write frame to a specific location on the sheet, set a named table style,
+        apply US-style date formatting, increase default float precision, apply
+        non-default total function to a single column, autofit:
+
+        >>> df.write_excel(  # doctest: +SKIP
+        ...     position="B4",
+        ...     table_style="Table Style Light 16",
+        ...     dtype_formats={pl.Date: "mm/dd/yyyy"},
+        ...     column_totals={"num": "average"},
+        ...     float_precision=6,
+        ...     autofit=True,
+        ... )
+
+        Write the same frame to a named worksheet twice, applying different styles
+        and conditional formatting to each table, adding table titles using explicit
+        xlsxwriter integration:
+
+        >>> from xlsxwriter import Workbook
+        >>> with Workbook("multi_frame.xlsx") as wb:  # doctest: +SKIP
+        ...     # basic/default conditional formatting
+        ...     df.write_excel(
+        ...         workbook=wb,
+        ...         worksheet="data",
+        ...         position=(3, 1),  # specify position as (row,col) coordinates
+        ...         conditional_formats={"num": "3_color_scale", "val": "data_bar"},
+        ...         table_style="Table Style Medium 4",
+        ...     )
+        ...
+        ...     # advanced conditional formatting, custom styles
+        ...     df.write_excel(
+        ...         workbook=wb,
+        ...         worksheet="data",
+        ...         position=(len(df) + 7, 1),
+        ...         table_style={
+        ...             "style": "Table Style Light 4",
+        ...             "first_column": True,
+        ...         },
+        ...         conditional_formats={
+        ...             "num": {
+        ...                 "type": "3_color_scale",
+        ...                 "min_color": "#76933c",
+        ...                 "mid_color": "#c4d79b",
+        ...                 "max_color": "#ebf1de",
+        ...             },
+        ...             "val": {
+        ...                 "type": "data_bar",
+        ...                 "data_bar_2010": True,
+        ...                 "bar_color": "#9bbb59",
+        ...                 "bar_negative_color_same": True,
+        ...                 "bar_negative_border_color_same": True,
+        ...             },
+        ...         },
+        ...         column_formats={"num": "#,##0.000;[White]-#,##0.000"},
+        ...         column_widths={"val": 125},
+        ...         autofit=True,
+        ...     )  # doctest: +IGNORE_RESULT
+        ...
+        ...     # add some table titles (with a custom format)
+        ...     ws = wb.get_worksheet_by_name("data")
+        ...     fmt_title = wb.add_format(
+        ...         {
+        ...             "font_color": "#4f6228",
+        ...             "font_size": 12,
+        ...             "italic": True,
+        ...             "bold": True,
+        ...         }
+        ...     )
+        ...     ws.write(2, 1, "Basic/default conditional formatting", fmt_title)
+        ...     ws.write(len(df) + 6, 1, "Customised conditional formatting", fmt_title)
+        ...
+
+        Export a table containing two different types of sparklines. Use default
+        options for the "trend" sparkline and customised options (and positioning)
+        for the "+/-" win_loss sparkline, with non-default integer dtype formatting,
+        column totals, and hidden worksheet gridlines:
+
+        >>> df = pl.DataFrame(
+        ...     {
+        ...         "id": ["aaa", "bbb", "ccc", "ddd", "eee"],
+        ...         "q1": [100, 55, -20, 0, 35],
+        ...         "q2": [30, -10, 15, 60, 20],
+        ...         "q3": [-50, 0, 40, 80, 80],
+        ...         "q4": [75, 55, 25, -10, -55],
+        ...     }
+        ... )
+        >>> df.write_excel(  # doctest: +SKIP
+        ...     table_style="Table Style Light 2",
+        ...     dtype_formats={pl.INTEGER_DTYPES: "#,##0_);(#,##0)"},
+        ...     sparklines={
+        ...         # default options; just provide source cols
+        ...         "trend": ["q1", "q2", "q3", "q4"],
+        ...         # customised sparkline type, with positioning directive
+        ...         "+/-": {
+        ...             "columns": ["q1", "q2", "q3", "q4"],
+        ...             "insert_after": "id",
+        ...             "type": "win_loss",
+        ...         },
+        ...     },
+        ...     column_totals=["q1", "q2", "q3", "q4"],
+        ...     hide_gridlines=True,
+        ... )
+
+        """
+        try:
+            import xlsxwriter
+            from xlsxwriter.utility import xl_cell_to_rowcol
+        except ImportError:
+            raise ImportError(
+                "Excel export requires xlsxwriter; please run `pip install XlsxWriter`"
+            ) from None
+
+        # setup workbook/worksheet
+        wb, ws, can_close = _xl_setup_workbook(workbook, worksheet)
+        df, is_empty = self, not len(self)
+
+        # setup table format/columns
+        table_style, table_options = _xl_setup_table_options(table_style)
+        table_columns, df = _xl_setup_table_columns(
+            df=df,
+            wb=wb,
+            column_formats=column_formats,
+            column_totals=column_totals,
+            dtype_formats=dtype_formats,
+            float_precision=float_precision,
+            sparklines=sparklines,
+        )
+
+        # normalise cell refs (eg: "B3" => (2,1)) and establish table start/finish,
+        # accounting for potential presence/absence of headers and a totals row.
+        table_start = (
+            xl_cell_to_rowcol(position) if isinstance(position, str) else position
+        )
+        table_finish = (
+            table_start[0]
+            + len(df)
+            + int(is_empty)
+            - int(not has_header)
+            + int(bool(column_totals)),
+            table_start[1] + len(df.columns) - 1,
+        )
+
+        # write table into the target sheet
+        if not is_empty or has_header:
+            frame_data = [[None] * len(df.columns)] if is_empty else df.rows()
+            ws.add_table(
+                *table_start,
+                *table_finish,
+                {
+                    "data": frame_data,
+                    "style": table_style,
+                    "columns": table_columns,
+                    "header_row": has_header,
+                    "autofilter": autofilter,
+                    "total_row": bool(column_totals) and not is_empty,
+                    "name": table_name or _xl_unique_table_name(wb),
+                    **table_options,
+                },
+            )
+            # apply any conditional formats
+            for col, fmt in (conditional_formats or {}).items():
+                col_range = _xl_column_range(df, table_start, col, has_header)
+                ws.conditional_format(
+                    *col_range, fmt if isinstance(fmt, dict) else {"type": fmt}
+                )
+
+        # worksheet options
+        if autofit and not is_empty:
+            xlv = xlsxwriter.__version__
+            if parse_version(xlv) < parse_version("3.0.8"):
+                raise ModuleNotFoundError(
+                    f'"autofit=True" requires xlsxwriter 3.0.8 or higher; found {xlv}.'
+                )
+            ws.autofit()
+        if hide_gridlines:
+            ws.hide_gridlines(2)
+
+        # additional column-level properties
+        hidden_columns = hidden_columns or ()
+        column_widths = column_widths or {}
+
+        for col in df.columns:
+            col_idx, options = table_start[1] + df.find_idx_by_name(col), {}
+            if col in hidden_columns:
+                options = {"hidden": True}
+            if col in column_widths:
+                ws.set_column_pixels(
+                    col_idx, col_idx, column_widths[col], None, options
+                )
+            elif options:
+                ws.set_column(col_idx, col_idx, None, None, options)
+
+        # finally, inject any sparklines into the table
+        for col, params in (sparklines or {}).items():
+            _xl_inject_sparklines(ws, df, table_start, col, has_header, params)
+
+        if can_close:
+            wb.close()
+        return wb
+
     def write_ipc(
         self,
         file: BinaryIO | BytesIO | str | Path,
@@ -2509,6 +2849,75 @@ class DataFrame:
             self._df.write_parquet(
                 file, compression, compression_level, statistics, row_group_size
             )
+
+    def write_database(
+        self,
+        table_name: str,
+        connection_uri: str,
+        *,
+        if_exists: DbWriteMode = "fail",
+        engine: DbWriteEngine = "sqlalchemy",
+    ) -> None:
+        """
+        Write a polars frame to a database.
+
+        Parameters
+        ----------
+        table_name
+            Name of the table to append to or create in the SQL database.
+        connection_uri
+            Connection uri, for example
+
+            * "postgresql://username:password@server:port/database"
+        if_exists : {'append', 'replace', 'fail'}
+            The insert mode.
+            'replace' will create a new database table, overwriting an existing one.
+            'append' will append to an existing table.
+            'fail' will fail if table already exists.
+        engine : {'sqlalchemy', 'adbc'}
+            Select the engine used for writing the data.
+        """
+        from polars.io.database import _open_adbc_connection
+
+        if engine == "adbc":
+            if if_exists == "fail":
+                raise ValueError("'if_exists' not yet supported with engine ADBC")
+            elif if_exists == "replace":
+                mode = "create"
+            elif if_exists == "append":
+                mode = "append"
+            else:
+                raise ValueError(
+                    f"Value for 'if_exists'={if_exists} was unexpected. "
+                    f"Choose one of: {'fail', 'replace', 'append'}."
+                )
+            with _open_adbc_connection(connection_uri) as conn:
+                cursor = conn.cursor()
+                cursor.adbc_ingest(table_name, self.to_arrow(), mode)
+                cursor.close()
+                conn.commit()
+        elif engine == "sqlalchemy":
+            if parse_version(pd.__version__) < parse_version("1.5"):
+                raise ModuleNotFoundError(
+                    f"Writing with engine 'sqlalchemy' requires Pandas 1.5.x or higher, found Pandas {pd.__version__}."
+                )
+            try:
+                from sqlalchemy import create_engine
+            except ImportError as err:
+                raise ImportError(
+                    "'sqlalchemy' not found. Install polars with 'pip install polars[sqlalchemy]'."
+                ) from err
+
+            engine = create_engine(connection_uri)
+
+            # this conversion to pandas as zero-copy
+            # so we can utilize their sql utils for free
+            self.to_pandas(use_pyarrow_extension_array=True).to_sql(
+                name=table_name, con=engine, if_exists=if_exists
+            )
+
+        else:
+            raise ValueError(f"'engine' {engine} is not supported.")
 
     def estimated_size(self, unit: SizeUnit = "b") -> int | float:
         """
@@ -3092,7 +3501,7 @@ class DataFrame:
             Sort in descending order. When sorting by multiple columns, can be specified
             per column by passing a sequence of booleans.
         nulls_last
-            Place null values last. Can only be used when sorting by a single column.
+            Place null values last.
 
         Examples
         --------
@@ -4876,6 +5285,9 @@ class DataFrame:
         └──────┴──────┴──────┘
 
         """
+        # faster path
+        if n == 0:
+            return self._from_pydf(self._df.clear())
         if n > 0 or len(self) > 0:
             return self.__class__(
                 {
@@ -5957,11 +6369,10 @@ class DataFrame:
         Expressions with multiple outputs can be automatically instantiated as Structs
         by enabling the experimental setting ``Config.set_auto_structify(True)``:
 
-        >>> from polars.datatypes import INTEGER_DTYPES
         >>> with pl.Config() as cfg:
         ...     cfg.set_auto_structify(True)  # doctest: +IGNORE_RESULT
         ...     df.select(
-        ...         is_odd=(pl.col(INTEGER_DTYPES) % 2).suffix("_is_odd"),
+        ...         is_odd=(pl.col(pl.INTEGER_DTYPES) % 2).suffix("_is_odd"),
         ...     )
         ...
         shape: (3, 1)
@@ -6843,7 +7254,9 @@ class DataFrame:
         with_replacement
             Allow values to be sampled more than once.
         shuffle
-            Shuffle the order of sampled data points.
+            If set to True, the order of the sampled rows will be shuffled. If
+            set to False (default), the order of the returned rows will be
+            neither stable nor fully random.
         seed
             Seed for the random number generator. If set to None (default), a random
             seed is generated using the ``random`` module.
@@ -7476,17 +7889,20 @@ class DataFrame:
         """
         return pli.wrap_s(self._df.to_struct(name))
 
-    def unnest(self, names: str | Sequence[str]) -> Self:
+    @deprecated_alias(names="columns")
+    def unnest(self, columns: str | Sequence[str], *more_columns: str) -> Self:
         """
-        Decompose a struct into its fields.
+        Decompose struct columns into separate columns for each of their fields.
 
-        The fields will be inserted into the `DataFrame` on the location of the
-        `struct` type.
+        The new columns will be inserted into the dataframe at the location of the
+        struct column.
 
         Parameters
         ----------
-        names
-           Names of the struct columns that will be decomposed by its fields
+        columns
+            Name of the struct column(s) that should be unnested.
+        *more_columns
+            Additional columns to unnest, specified as positional arguments.
 
         Examples
         --------
@@ -7499,7 +7915,7 @@ class DataFrame:
         ...         "t_d": [[1, 2], [3]],
         ...         "after": ["baz", "womp"],
         ...     }
-        ... ).select(["before", pl.struct(pl.col("^t_.$")).alias("t_struct"), "after"])
+        ... ).select("before", pl.struct(pl.col("^t_.$")).alias("t_struct"), "after")
         >>> df
         shape: (2, 3)
         ┌────────┬─────────────────────┬───────┐
@@ -7522,16 +7938,20 @@ class DataFrame:
         └────────┴─────┴─────┴──────┴───────────┴───────┘
 
         """
-        if isinstance(names, str):
-            names = [names]
-        return self._from_pydf(self._df.unnest(names))
+        if isinstance(columns, str):
+            columns = [columns]
+        if more_columns:
+            columns = list(columns)
+            columns.extend(more_columns)
+        return self._from_pydf(self._df.unnest(columns))
 
     @typing.no_type_check
-    def pearson_corr(self, **kwargs: Any) -> Self:
+    def corr(self, **kwargs: Any) -> Self:
         """
         Return Pearson product-moment correlation coefficients.
 
-        See numpy corrcoef for more information.
+        See numpy ``corrcoef`` for more information:
+        https://numpy.org/doc/stable/reference/generated/numpy.corrcoef.html
 
         Notes
         -----
@@ -7545,7 +7965,7 @@ class DataFrame:
         Examples
         --------
         >>> df = pl.DataFrame({"foo": [1, 2, 3], "bar": [3, 2, 1], "ham": [7, 8, 9]})
-        >>> df.pearson_corr()
+        >>> df.corr()
         shape: (3, 3)
         ┌──────┬──────┬──────┐
         │ foo  ┆ bar  ┆ ham  │

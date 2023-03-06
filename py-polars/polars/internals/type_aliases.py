@@ -10,16 +10,16 @@ if sys.version_info >= (3, 8):
 else:
     from typing_extensions import Literal
 
-if sys.version_info >= (3, 10):
-    from typing import TypeAlias
-else:
-    from typing_extensions import TypeAlias
-
 if TYPE_CHECKING:
     from polars import internals as pli
     from polars.dependencies import numpy as np
     from polars.dependencies import pandas as pd
     from polars.dependencies import pyarrow as pa
+
+    if sys.version_info >= (3, 10):
+        from typing import TypeAlias
+    else:
+        from typing_extensions import TypeAlias
 
 
 # Types that qualify as expressions (eg: for use in 'select', 'with_columns'...)
@@ -68,6 +68,7 @@ StartBy: TypeAlias = Literal["window", "datapoint", "monday"]
 TimeUnit: TypeAlias = Literal["ns", "us", "ms"]
 UniqueKeepStrategy: TypeAlias = Literal["first", "last", "none"]
 UnstackDirection: TypeAlias = Literal["vertical", "horizontal"]
+ApplyStrategy: TypeAlias = Literal["thread_local", "threading"]
 
 # The following have a Rust enum equivalent with a different name
 AsofJoinStrategy: TypeAlias = Literal["backward", "forward"]  # AsofStrategy
@@ -89,6 +90,10 @@ EpochTimeUnit = Literal["ns", "us", "ms", "s", "d"]
 Orientation: TypeAlias = Literal["col", "row"]
 SearchSortedSide: TypeAlias = Literal["any", "left", "right"]
 TransferEncoding: TypeAlias = Literal["hex", "base64"]
+CorrelationMethod: TypeAlias = Literal["pearson", "spearman"]
+DbReadEngine: TypeAlias = Literal["adbc", "connectorx"]
+DbWriteEngine: TypeAlias = Literal["sqlalchemy", "adbc"]
+DbWriteMode: TypeAlias = Literal["replace", "append", "fail"]
 
 # type signature for allowed frame init
 FrameInitTypes: TypeAlias = "Mapping[str, Sequence[object] | Mapping[str, Sequence[object]] | pli.Series] | Sequence[Any] | np.ndarray[Any, Any] | pa.Table | pd.DataFrame | pli.Series"

@@ -17,6 +17,7 @@ pub(crate) struct CsvSource {
     reader: *mut CsvReader<'static, File>,
     batched_reader: *mut BatchedCsvReader<'static>,
     n_threads: usize,
+    chunk_index: IdxSize,
 }
 
 impl CsvSource {
@@ -37,15 +38,10 @@ impl CsvSource {
         }
         let n_rows = _set_n_rows_for_scan(options.n_rows);
 
-        // Safety:
-        // schema will be owned by CsvSource and have a valid lifetime until CsvSource is dropped
-        let schema_ref =
-            unsafe { std::mem::transmute::<&Schema, &'static Schema>(schema.as_ref()) };
-
         let n_cols = if projected_len > 0 {
             projected_len
         } else {
-            schema_ref.len()
+            schema.len()
         };
         // inversely scale the chunk size by the number of threads so that we reduce memory pressure
         // in streaming
@@ -55,7 +51,7 @@ impl CsvSource {
         let reader = CsvReader::from_path(&path)
             .unwrap()
             .has_header(options.has_header)
-            .with_schema(schema_ref)
+            .with_schema(schema.clone())
             .with_delimiter(options.delimiter)
             .with_ignore_errors(options.ignore_errors)
             .with_skip_rows(options.skip_rows)
@@ -85,6 +81,7 @@ impl CsvSource {
             reader,
             batched_reader,
             n_threads: POOL.current_num_threads(),
+            chunk_index: 0,
         })
     }
 }
@@ -111,7 +108,14 @@ impl Source for CsvSource {
             Some(batches) => SourceResult::GotMoreData(
                 batches
                     .into_iter()
-                    .map(|(chunk_index, data)| DataChunk { chunk_index, data })
+                    .map(|data| {
+                        let out = DataChunk {
+                            chunk_index: self.chunk_index,
+                            data,
+                        };
+                        self.chunk_index += 1;
+                        out
+                    })
                     .collect(),
             ),
         })

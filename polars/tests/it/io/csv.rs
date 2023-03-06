@@ -362,8 +362,8 @@ fn test_empty_bytes_to_dataframe() {
 
     let result = CsvReader::new(file)
         .has_header(false)
-        .with_columns(Some(schema.iter_names().cloned().collect()))
-        .with_schema(&schema)
+        .with_columns(Some(schema.iter_names().map(|s| s.to_string()).collect()))
+        .with_schema(Arc::new(schema))
         .finish();
     assert!(result.is_ok())
 }
@@ -392,14 +392,14 @@ fn test_missing_value() {
     let file = Cursor::new(csv);
     let df = CsvReader::new(file)
         .has_header(true)
-        .with_schema(&Schema::from(
+        .with_schema(Arc::new(Schema::from(
             vec![
                 Field::new("foo", DataType::UInt32),
                 Field::new("bar", DataType::UInt32),
                 Field::new("ham", DataType::UInt32),
             ]
             .into_iter(),
-        ))
+        )))
         .finish()
         .unwrap();
     assert_eq!(df.column("ham").unwrap().len(), 3)
@@ -417,13 +417,13 @@ AUDCAD,1616455921,0.96212,0.95666,1
     let file = Cursor::new(csv);
     let df = CsvReader::new(file)
         .has_header(true)
-        .with_dtypes(Some(&Schema::from(
+        .with_dtypes(Some(Arc::new(Schema::from(
             vec![Field::new(
                 "b",
                 DataType::Datetime(TimeUnit::Nanoseconds, None),
             )]
             .into_iter(),
-        )))
+        ))))
         .finish()?;
 
     assert_eq!(
@@ -1076,5 +1076,20 @@ fn test_try_parse_dates_3380() -> PolarsResult<()> {
         .with_try_parse_dates(true)
         .finish()?;
     assert_eq!(df.column("validdate")?.null_count(), 0);
+    Ok(())
+}
+
+#[test]
+fn test_leading_whitespace_with_quote() -> PolarsResult<()> {
+    let csv = r#"
+"ABC","DEF",
+"24.5","  4.1"
+"#;
+    let file = Cursor::new(csv);
+    let df = CsvReader::new(file).finish()?;
+    let col_1 = df.column("ABC").unwrap();
+    let col_2 = df.column("DEF").unwrap();
+    assert_eq!(col_1.get(0)?, AnyValue::Float64(24.5));
+    assert_eq!(col_2.get(0)?, AnyValue::Float64(4.1));
     Ok(())
 }

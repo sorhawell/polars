@@ -1,7 +1,6 @@
 use polars_utils::slice::*;
 
-use crate::row::RowsEncoded;
-use crate::sort_field::SortField;
+use crate::row::{RowsEncoded, SortField};
 
 /// Encodes a value of a particular fixed width type into bytes
 pub trait FixedLengthEncoding: Copy {
@@ -150,7 +149,7 @@ pub(crate) fn encode_slice<T: FixedLengthEncoding>(
 }
 
 #[inline]
-fn null_sentinel(field: &SortField) -> u8 {
+pub(super) fn null_sentinel(field: &SortField) -> u8 {
     if field.nulls_last {
         0xFF
     } else {

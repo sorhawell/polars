@@ -4,6 +4,7 @@ import sys
 import textwrap
 import typing
 from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 from io import BytesIO
 from operator import floordiv, truediv
 from typing import TYPE_CHECKING, Any, Callable, Iterator, Sequence, cast
@@ -197,7 +198,8 @@ def test_mixed_sequence_selection() -> None:
     assert_frame_equal(result, expected)
 
 
-def test_from_arrow() -> None:
+def test_from_arrow(monkeypatch: Any) -> None:
+    monkeypatch.setenv("POLARS_ACTIVATE_DECIMAL", "1")
     tbl = pa.table(
         {
             "a": pa.array([1, 2], pa.timestamp("s")),
@@ -214,7 +216,7 @@ def test_from_arrow() -> None:
         "c": pl.Datetime("us"),
         "d": pl.Datetime("ns"),
         "e": pl.Int32,
-        "decimal1": pl.Float64,
+        "decimal1": pl.Decimal(2, 1),
     }
     expected_data = [
         (
@@ -223,7 +225,7 @@ def test_from_arrow() -> None:
             datetime(1970, 1, 1, 0, 0, 0, 1),
             datetime(1970, 1, 1, 0, 0),
             1,
-            1.0,
+            Decimal("1.0"),
         ),
         (
             datetime(1970, 1, 1, 0, 0, 2),
@@ -231,7 +233,7 @@ def test_from_arrow() -> None:
             datetime(1970, 1, 1, 0, 0, 0, 2),
             datetime(1970, 1, 1, 0, 0),
             2,
-            2.0,
+            Decimal("2.0"),
         ),
     ]
 
@@ -788,7 +790,7 @@ def test_concat() -> None:
 def test_concat_str() -> None:
     df = pl.DataFrame({"a": ["a", "b", "c"], "b": [1, 2, 3]})
 
-    out = df.select([pl.concat_str(["a", "b"], sep="-")])
+    out = df.select([pl.concat_str(["a", "b"], separator="-")])
     assert out["a"].to_list() == ["a-1", "b-2", "c-3"]
 
     out = df.select([pl.format("foo_{}_bar_{}", pl.col("a"), "b").alias("fmt")])
@@ -800,9 +802,9 @@ def test_arg_where() -> None:
     assert_series_equal(pl.arg_where(s, eager=True).cast(int), pl.Series([0, 2]))
 
 
-def test_get_dummies() -> None:
+def test_to_dummies2() -> None:
     df = pl.DataFrame({"a": [1, 2, 3]})
-    res = pl.get_dummies(df)
+    res = df.to_dummies()
     expected = pl.DataFrame(
         {"a_1": [1, 0, 0], "a_2": [0, 1, 0], "a_3": [0, 0, 1]}
     ).with_columns(pl.all().cast(pl.UInt8))
@@ -820,8 +822,14 @@ def test_get_dummies() -> None:
         },
         schema={"i": pl.Int32, "category|cat": pl.UInt8, "category|dog": pl.UInt8},
     )
-    result = pl.get_dummies(df, columns=["category"], separator="|")
+    result = df.to_dummies(columns=["category"], separator="|")
     assert_frame_equal(result, expected)
+
+
+def test_get_dummies_function_deprecated() -> None:
+    df = pl.DataFrame({"a": [1, 2, 3]})
+    with pytest.deprecated_call():
+        pl.get_dummies(df)
 
 
 def test_to_pandas(df: pl.DataFrame) -> None:
@@ -3150,17 +3158,14 @@ def test_init_datetimes_with_timezone() -> None:
                 }
             },
         ):
-            df = pl.DataFrame(  # type: ignore[arg-type]
-                data={"d1": [dtm], "d2": [dtm]},
-                **type_overrides,
-            )
-            assert (df["d1"].to_physical() == df["d2"].to_physical()).all()
-            assert df.rows() == [
-                (
-                    datetime(2022, 10, 12, 8, 30, tzinfo=ZoneInfo(tz_us)),
-                    datetime(2022, 10, 12, 14, 30, tzinfo=ZoneInfo(tz_europe)),
+            with pytest.raises(
+                ValueError,
+                match="Given time_zone is different from that of timezone aware datetimes",
+            ):
+                pl.DataFrame(  # type: ignore[arg-type]
+                    data={"d1": [dtm], "d2": [dtm]},
+                    **type_overrides,
                 )
-            ]
 
 
 def test_init_physical_with_timezone() -> None:
@@ -3386,7 +3391,13 @@ def test_format_empty_df() -> None:
 def test_deadlocks_3409() -> None:
     assert (
         pl.DataFrame({"col1": [[1, 2, 3]]})
-        .with_columns([pl.col("col1").arr.eval(pl.element().apply(lambda x: x))])
+        .with_columns(
+            [
+                pl.col("col1").arr.eval(
+                    pl.element().apply(lambda x: x, return_dtype=pl.Int64)
+                )
+            ]
+        )
         .to_dict(False)
     ) == {"col1": [[1, 2, 3]]}
 

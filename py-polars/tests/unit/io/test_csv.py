@@ -14,7 +14,6 @@ import numpy as np
 import pytest
 
 import polars as pl
-from polars import DataType
 from polars.exceptions import ComputeError, NoDataError
 from polars.testing import (
     assert_frame_equal,
@@ -60,6 +59,7 @@ def test_to_from_buffer(df_no_lists: pl.DataFrame) -> None:
         assert_frame_equal_local_categoricals(df.select(["time", "cat"]), read_df)
 
 
+@pytest.mark.write_disk()
 def test_to_from_file(df_no_lists: pl.DataFrame) -> None:
     df = df_no_lists.drop("strings_nulls")
 
@@ -366,6 +366,7 @@ def test_read_csv_buffer_ownership() -> None:
     assert buf.read() == bts
 
 
+@pytest.mark.write_disk()
 def test_read_csv_encoding() -> None:
     bts = (
         b"Value1,Value2,Value3,Value4,Region\n"
@@ -574,7 +575,7 @@ def test_ignore_try_parse_dates() -> None:
     ).encode()
 
     headers = ["a", "b", "c"]
-    dtypes: dict[str, type[DataType]] = {
+    dtypes: dict[str, type[pl.DataType]] = {
         k: pl.Utf8 for k in headers
     }  # Forces Utf8 type for every column
     df = pl.read_csv(csv, columns=headers, dtypes=dtypes)
@@ -748,6 +749,7 @@ def test_csv_string_escaping() -> None:
     assert_frame_equal(df_read, df)
 
 
+@pytest.mark.write_disk()
 def test_glob_csv(df_no_lists: pl.DataFrame) -> None:
     df = df_no_lists.drop("strings_nulls")
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -1025,6 +1027,15 @@ def test_duplicated_columns() -> None:
     assert pl.read_csv(csv.encode(), new_columns=new).columns == new
 
 
+def test_error_message() -> None:
+    data = io.StringIO("target,wind,energy,miso\n" "1,2,3,4\n" "1,2,1e5,1\n")
+    with pytest.raises(
+        ComputeError,
+        match=r"Could not parse `1e5` as dtype Int64 at column 'energy' \(column number 3\)",
+    ):
+        pl.read_csv(data, infer_schema_length=1)
+
+
 def test_csv_categorical_lifetime() -> None:
     # escaped strings do some heap allocates in the builder
     # this tests of the lifetimes remains valid
@@ -1064,21 +1075,22 @@ def test_batched_csv_reader(foods_file_path: Path) -> None:
     assert batches is not None
     assert len(batches) == 5
     assert batches[0].to_dict(False) == {
-        "category": ["vegetables"],
-        "calories": [45],
-        "fats_g": [0.5],
-        "sugars_g": [2],
+        "category": ["vegetables", "seafood", "meat", "fruit", "seafood", "meat"],
+        "calories": [45, 150, 100, 60, 140, 120],
+        "fats_g": [0.5, 5.0, 5.0, 0.0, 5.0, 10.0],
+        "sugars_g": [2, 0, 0, 11, 1, 1],
     }
     assert batches[-1].to_dict(False) == {
-        "category": ["meat"],
-        "calories": [120],
-        "fats_g": [10.0],
-        "sugars_g": [1],
+        "category": ["fruit", "meat", "vegetables", "fruit"],
+        "calories": [130, 100, 30, 50],
+        "fats_g": [0.0, 7.0, 0.0, 0.0],
+        "sugars_g": [25, 0, 5, 11],
     }
+    assert_frame_equal(pl.concat(batches), pl.read_csv(foods_file_path))
 
 
 def test_batched_csv_reader_all_batches(foods_file_path: Path) -> None:
-    for new_columns in [None, ["Category", "Calories", "Fats_g", "Augars_g"]]:
+    for new_columns in [None, ["Category", "Calories", "Fats_g", "Sugars_g"]]:
         out = pl.read_csv(foods_file_path, new_columns=new_columns)
         reader = pl.read_csv_batched(
             foods_file_path, new_columns=new_columns, batch_size=4
@@ -1163,6 +1175,7 @@ def test_csv_statistics_offset() -> None:
     assert pl.read_csv(io.StringIO(csv), n_rows=N).height == 4999
 
 
+@pytest.mark.write_disk()
 @pytest.mark.xfail(sys.platform == "win32", reason="Does not work on Windows")
 def test_csv_scan_categorical() -> None:
     N = 5_000

@@ -14,7 +14,7 @@ use crate::error::PyPolarsErr;
 use crate::list_construction::py_seq_to_list;
 use crate::prelude::*;
 use crate::set::set_at_idx;
-use crate::{apply_method_all_arrow_series2, arrow_interop};
+use crate::{apply_method_all_arrow_series2, arrow_interop, raise_err};
 
 #[pyclass]
 #[repr(transparent)]
@@ -268,6 +268,20 @@ impl PySeries {
     pub fn new_series_list(name: &str, val: Vec<Self>, _strict: bool) -> Self {
         let series_vec = to_series_collection(val);
         Series::new(name, &series_vec).into()
+    }
+
+    #[staticmethod]
+    pub fn new_decimal(
+        name: &str,
+        val: Vec<Wrap<AnyValue<'_>>>,
+        _strict: bool,
+    ) -> PyResult<PySeries> {
+        // TODO: do we have to respect 'strict' here? it's possible if we want to
+        let avs = slice_extract_wrapped(&val);
+        // create a fake dtype with a placeholder "none" scale, to be inferred later
+        let dtype = DataType::Decimal(None, None);
+        let s = Series::from_any_values_and_dtype(name, avs, &dtype).map_err(PyPolarsErr::from)?;
+        Ok(s.into())
     }
 
     #[staticmethod]
@@ -660,7 +674,6 @@ impl PySeries {
                     DataType::Int64 => PyList::new(py, series.i64().unwrap()),
                     DataType::Float32 => PyList::new(py, series.f32().unwrap()),
                     DataType::Float64 => PyList::new(py, series.f64().unwrap()),
-                    DataType::Decimal128(_) => todo!(),
                     DataType::Categorical(_) => {
                         PyList::new(py, series.categorical().unwrap().iter_str())
                     }
@@ -702,6 +715,10 @@ impl PySeries {
                     }
                     DataType::Datetime(_, _) => {
                         let ca = series.datetime().unwrap();
+                        return Wrap(ca).to_object(py);
+                    }
+                    DataType::Decimal(_, _) => {
+                        let ca = series.decimal().unwrap();
                         return Wrap(ca).to_object(py);
                     }
                     DataType::Utf8 => {
@@ -809,32 +826,42 @@ impl PySeries {
         output_type: Option<Wrap<DataType>>,
         skip_nulls: bool,
     ) -> PyResult<PySeries> {
-        Python::with_gil(|py| {
-            let series = &self.series;
+        let series = &self.series;
 
-            let output_type = output_type.map(|dt| dt.0);
+        if skip_nulls && (series.null_count() == series.len()) {
+            if let Some(output_type) = output_type {
+                return Ok(Series::full_null(series.name(), series.len(), &output_type.0).into());
+            }
+            let msg = "The output type of 'apply' function cannot determined.\n\
+            The function was never called because 'skip_nulls=True' and all values are null.\n\
+            Consider setting 'skip_nulls=False' or setting the 'return_dtype'.";
+            raise_err!(msg, ComputeError)
+        }
 
-            macro_rules! dispatch_apply {
-                ($self:expr, $method:ident, $($args:expr),*) => {
-                    match $self.dtype() {
-                        #[cfg(feature = "object")]
-                        DataType::Object(_) => {
-                            let ca = $self.0.unpack::<ObjectType<ObjectValue>>().unwrap();
-                            ca.$method($($args),*)
-                        },
-                        _ => {
-                            apply_method_all_arrow_series2!(
-                                $self,
-                                $method,
-                                $($args),*
-                            )
-                        }
+        let output_type = output_type.map(|dt| dt.0);
 
+        macro_rules! dispatch_apply {
+            ($self:expr, $method:ident, $($args:expr),*) => {
+                match $self.dtype() {
+                    #[cfg(feature = "object")]
+                    DataType::Object(_) => {
+                        let ca = $self.0.unpack::<ObjectType<ObjectValue>>().unwrap();
+                        ca.$method($($args),*)
+                    },
+                    _ => {
+                        apply_method_all_arrow_series2!(
+                            $self,
+                            $method,
+                            $($args),*
+                        )
                     }
-                }
 
+                }
             }
 
+        }
+
+        Python::with_gil(|py| {
             if matches!(
                 self.series.dtype(),
                 DataType::Datetime(_, _)
@@ -1163,6 +1190,10 @@ impl PySeries {
             multithreaded: true,
         };
         self.series.is_sorted(options)
+    }
+
+    pub fn clear(&self) -> Self {
+        self.series.clear().into()
     }
 }
 

@@ -80,10 +80,11 @@ pub enum AnyValue<'a> {
     StructOwned(Box<(Vec<AnyValue<'a>>, Vec<Field>)>),
     /// An UTF8 encoded string type.
     Utf8Owned(smartstring::alias::String),
-    #[cfg(feature = "dtype-binary")]
     Binary(&'a [u8]),
-    #[cfg(feature = "dtype-binary")]
     BinaryOwned(Vec<u8>),
+    /// A 128-bit fixed point decimal number.
+    #[cfg(feature = "dtype-decimal")]
+    Decimal(i128, usize),
 }
 
 #[cfg(feature = "serde")]
@@ -112,9 +113,7 @@ impl Serialize for AnyValue<'_> {
             AnyValue::Utf8Owned(v) => {
                 serializer.serialize_newtype_variant(name, 13, "Utf8Owned", v.as_str())
             }
-            #[cfg(feature = "dtype-binary")]
             AnyValue::Binary(v) => serializer.serialize_newtype_variant(name, 14, "BinaryOwned", v),
-            #[cfg(feature = "dtype-binary")]
             AnyValue::BinaryOwned(v) => {
                 serializer.serialize_newtype_variant(name, 14, "BinaryOwned", v)
             }
@@ -145,7 +144,6 @@ impl<'a> Deserialize<'a> for AnyValue<'static> {
             List,
             Bool,
             Utf8Owned,
-            #[cfg(feature = "dtype-binary")]
             BinaryOwned,
         }
         const VARIANTS: &[&str] = &[
@@ -165,10 +163,7 @@ impl<'a> Deserialize<'a> for AnyValue<'static> {
             "Utf8Owned",
             "BinaryOwned",
         ];
-        #[cfg(feature = "dtype-binary")]
         const LAST: u8 = unsafe { std::mem::transmute::<_, u8>(AvField::BinaryOwned) };
-        #[cfg(not(feature = "dtype-binary"))]
-        const LAST: u8 = unsafe { std::mem::transmute::<_, u8>(AvField::Utf8Owned) };
 
         struct FieldVisitor;
 
@@ -231,7 +226,6 @@ impl<'a> Deserialize<'a> for AnyValue<'static> {
                     b"List" => AvField::List,
                     b"Bool" => AvField::Bool,
                     b"Utf8Owned" | b"Utf8" => AvField::Utf8Owned,
-                    #[cfg(feature = "dtype-binary")]
                     b"BinaryOwned" | b"Binary" => AvField::BinaryOwned,
                     _ => {
                         return Err(serde::de::Error::unknown_variant(
@@ -320,7 +314,6 @@ impl<'a> Deserialize<'a> for AnyValue<'static> {
                         let value: String = variant.newtype_variant()?;
                         AnyValue::Utf8Owned(value.into())
                     }
-                    #[cfg(feature = "dtype-binary")]
                     (AvField::BinaryOwned, variant) => {
                         let value = variant.newtype_variant()?;
                         AnyValue::BinaryOwned(value)
@@ -365,7 +358,6 @@ impl<'a> AnyValue<'a> {
             Struct(_, _, fields) => DataType::Struct(fields.to_vec()),
             #[cfg(feature = "dtype-struct")]
             StructOwned(payload) => DataType::Struct(payload.1.clone()),
-            #[cfg(feature = "dtype-binary")]
             Binary(_) => DataType::Binary,
             _ => unimplemented!(),
         }
@@ -395,6 +387,8 @@ impl<'a> AnyValue<'a> {
             Time(v) => NumCast::from(*v),
             #[cfg(feature = "dtype-duration")]
             Duration(v, _) => NumCast::from(*v),
+            #[cfg(feature = "dtype-decimal")]
+            Decimal(v, _) => NumCast::from(*v),
             Boolean(v) => {
                 if *v {
                     NumCast::from(1)
@@ -501,9 +495,7 @@ impl<'a> Hash for AnyValue<'a> {
             Utf8Owned(v) => state.write(v.as_bytes()),
             Float32(v) => state.write_u32(v.to_bits()),
             Float64(v) => state.write_u64(v.to_bits()),
-            #[cfg(feature = "dtype-binary")]
             Binary(v) => state.write(v),
-            #[cfg(feature = "dtype-binary")]
             BinaryOwned(v) => state.write(v),
             Boolean(v) => state.write_u8(*v as u8),
             List(v) => Hash::hash(&Wrap(v.clone()), state),
@@ -583,7 +575,6 @@ impl<'a> AnyValue<'a> {
     #[inline]
     pub fn as_borrowed(&self) -> AnyValue<'_> {
         match self {
-            #[cfg(feature = "dtype-binary")]
             AnyValue::BinaryOwned(data) => AnyValue::Binary(data),
             AnyValue::Utf8Owned(data) => AnyValue::Utf8(data),
             av => av.clone(),
@@ -615,9 +606,7 @@ impl<'a> AnyValue<'a> {
             List(v) => List(v),
             Utf8(v) => Utf8Owned(v.into()),
             Utf8Owned(v) => Utf8Owned(v),
-            #[cfg(feature = "dtype-binary")]
             Binary(v) => BinaryOwned(v.to_vec()),
-            #[cfg(feature = "dtype-binary")]
             BinaryOwned(v) => BinaryOwned(v),
             #[cfg(feature = "object")]
             Object(v) => ObjectOwned(OwnedObject(v.to_boxed())),
@@ -685,7 +674,6 @@ impl PartialEq for AnyValue<'_> {
             (Datetime(l, tul, tzl), Datetime(r, tur, tzr)) => l == r && tul == tur && tzl == tzr,
             (Boolean(l), Boolean(r)) => l == r,
             (List(l), List(r)) => l == r,
-            #[cfg(feature = "dtype-binary")]
             (Binary(l), Binary(r)) => l == r,
             (Utf8(l), Utf8(r)) => l == r,
             #[cfg(feature = "object")]
@@ -725,7 +713,6 @@ impl PartialOrd for AnyValue<'_> {
             (Float32(l), Float32(r)) => l.partial_cmp(r),
             (Float64(l), Float64(r)) => l.partial_cmp(r),
             (Utf8(l), Utf8(r)) => l.partial_cmp(*r),
-            #[cfg(feature = "dtype-binary")]
             (Binary(l), Binary(r)) => l.partial_cmp(*r),
             _ => None,
         }
@@ -775,9 +762,7 @@ mod test {
             ),
             (ArrowDataType::LargeUtf8, DataType::Utf8),
             (ArrowDataType::Utf8, DataType::Utf8),
-            #[cfg(feature = "dtype-binary")]
             (ArrowDataType::LargeBinary, DataType::Binary),
-            #[cfg(feature = "dtype-binary")]
             (ArrowDataType::Binary, DataType::Binary),
             (
                 ArrowDataType::Time64(ArrowTimeUnit::Nanosecond),

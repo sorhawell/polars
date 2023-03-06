@@ -6,8 +6,6 @@ use std::ops::{BitAnd, BitOr};
 
 use polars_core::export::arrow::temporal_conversions::NANOSECONDS;
 use polars_core::utils::arrow::temporal_conversions::SECONDS_IN_DAY;
-#[cfg(feature = "rank")]
-use polars_core::utils::coalesce_nulls_series;
 #[cfg(feature = "dtype-struct")]
 use polars_core::utils::get_supertype;
 
@@ -179,6 +177,7 @@ pub fn pearson_corr(a: Expr, b: Expr, ddof: u8) -> Expr {
 ///     and thus lead to the highest rank.
 #[cfg(all(feature = "rank", feature = "propagate_nans"))]
 pub fn spearman_rank_corr(a: Expr, b: Expr, ddof: u8, propagate_nans: bool) -> Expr {
+    use polars_core::utils::coalesce_nulls_series;
     use polars_ops::prelude::nan_propagating_aggregate::nan_max_s;
 
     let function = move |a: Series, b: Series| {
@@ -254,15 +253,15 @@ pub fn arg_sort_by<E: AsRef<[Expr]>>(by: E, descending: &[bool]) -> Expr {
 
 #[cfg(all(feature = "concat_str", feature = "strings"))]
 /// Horizontally concat string columns in linear time
-pub fn concat_str<E: AsRef<[Expr]>>(s: E, sep: &str) -> Expr {
+pub fn concat_str<E: AsRef<[Expr]>>(s: E, separator: &str) -> Expr {
     let input = s.as_ref().to_vec();
-    let sep = sep.to_string();
+    let separator = separator.to_string();
 
     Expr::Function {
         input,
-        function: StringFunction::ConcatHorizontal(sep).into(),
+        function: StringFunction::ConcatHorizontal(separator).into(),
         options: FunctionOptions {
-            collect_groups: ApplyOptions::ApplyGroups,
+            collect_groups: ApplyOptions::ApplyFlat,
             input_wildcard_expansion: true,
             auto_explode: true,
             ..Default::default()
@@ -302,10 +301,16 @@ pub fn format_str<E: AsRef<[Expr]>>(format: &str, args: E) -> PolarsResult<Expr>
 }
 
 /// Concat lists entries.
-pub fn concat_lst<E: AsRef<[IE]>, IE: Into<Expr> + Clone>(s: E) -> Expr {
-    let s = s.as_ref().iter().map(|e| e.clone().into()).collect();
+pub fn concat_lst<E: AsRef<[IE]>, IE: Into<Expr> + Clone>(s: E) -> PolarsResult<Expr> {
+    let s: Vec<_> = s.as_ref().iter().map(|e| e.clone().into()).collect();
 
-    Expr::Function {
+    if s.is_empty() {
+        return Err(PolarsError::ComputeError(
+            "concat_list needs one or more expressions".into(),
+        ));
+    }
+
+    Ok(Expr::Function {
         input: s,
         function: FunctionExpr::ListExpr(ListFunction::Concat),
         options: FunctionOptions {
@@ -314,7 +319,7 @@ pub fn concat_lst<E: AsRef<[IE]>, IE: Into<Expr> + Clone>(s: E) -> Expr {
             fmt_str: "concat_list",
             ..Default::default()
         },
-    }
+    })
 }
 
 /// Create list entries that are range arrays
@@ -449,6 +454,7 @@ pub struct DatetimeArgs {
     pub microsecond: Option<Expr>,
 }
 
+/// Construct a column of `Datetime` from the provided args.
 #[cfg(feature = "temporal")]
 pub fn datetime(args: DatetimeArgs) -> Expr {
     use polars_core::export::chrono::NaiveDate;
@@ -564,6 +570,7 @@ pub struct DurationArgs {
     pub weeks: Option<Expr>,
 }
 
+/// Construct a column of `Duration` from the provided args.
 #[cfg(feature = "temporal")]
 pub fn duration(args: DurationArgs) -> Expr {
     let function = SpecialEq::new(Arc::new(move |s: &mut [Series]| {
@@ -641,7 +648,8 @@ pub fn duration(args: DurationArgs) -> Expr {
 ///
 /// # Arguments
 ///
-/// * `name` - A string slice that holds the name of the column
+/// * `name` - A string slice that holds the name of the column. If a column with this name does not exist when the
+///   LazyFrame is collected, an error is returned.
 ///
 /// # Examples
 ///
@@ -667,12 +675,12 @@ pub fn col(name: &str) -> Expr {
     }
 }
 
-/// Selects all columns
+/// Selects all columns. Shorthand for `col("*")`.
 pub fn all() -> Expr {
     Expr::Wildcard
 }
 
-/// Select multiple columns by name
+/// Select multiple columns by name.
 pub fn cols<I: IntoVec<String>>(names: I) -> Expr {
     let names = names.into_vec();
     Expr::Columns(names)
@@ -689,37 +697,37 @@ pub fn dtype_cols<DT: AsRef<[DataType]>>(dtype: DT) -> Expr {
     Expr::DtypeColumn(dtypes)
 }
 
-/// Sum all the values in this Expression.
+/// Sum all the values in the column named `name`. Shorthand for `col(name).sum()`.
 pub fn sum(name: &str) -> Expr {
     col(name).sum()
 }
 
-/// Find the minimum of all the values in this Expression.
+/// Find the minimum of all the values in the column named `name`. Shorthand for `col(name).min()`.
 pub fn min(name: &str) -> Expr {
     col(name).min()
 }
 
-/// Find the maximum of all the values in this Expression.
+/// Find the maximum of all the values in the column named `name`. Shorthand for `col(name).max()`.
 pub fn max(name: &str) -> Expr {
     col(name).max()
 }
 
-/// Find the mean of all the values in this Expression.
+/// Find the mean of all the values in the column named `name`. Shorthand for `col(name).mean()`.
 pub fn mean(name: &str) -> Expr {
     col(name).mean()
 }
 
-/// Find the mean of all the values in this Expression.
+/// Find the mean of all the values in the column named `name`. Alias for [`mean`].
 pub fn avg(name: &str) -> Expr {
     col(name).mean()
 }
 
-/// Find the median of all the values in this Expression.
+/// Find the median of all the values in the column named `name`. Shorthand for `col(name).median()`.
 pub fn median(name: &str) -> Expr {
     col(name).median()
 }
 
-/// Find a specific quantile of all the values in this Expression.
+/// Find a specific quantile of all the values in the column named `name`.
 pub fn quantile(name: &str, quantile: Expr, interpol: QuantileInterpolOptions) -> Expr {
     col(name).quantile(quantile, interpol)
 }
@@ -736,6 +744,8 @@ macro_rules! prepare_binary_function {
 }
 
 /// Apply a closure on the two columns that are evaluated from `Expr` a and `Expr` b.
+///
+/// The closure takes two arguments, each a `Series`. `output_type` must be the output dtype of the resulting `Series`.
 pub fn map_binary<F: 'static>(a: Expr, b: Expr, f: F, output_type: GetOutput) -> Expr
 where
     F: Fn(Series, Series) -> PolarsResult<Option<Series>> + Send + Sync,
@@ -744,6 +754,9 @@ where
     a.map_many(function, &[b], output_type)
 }
 
+/// Like [`map_binary`], but used in a groupby-aggregation context.
+///
+/// See [`Expr::apply`] for the difference between [`map`](Expr::map) and [`apply`](Expr::apply).
 pub fn apply_binary<F: 'static>(a: Expr, b: Expr, f: F, output_type: GetOutput) -> Expr
 where
     F: Fn(Series, Series) -> PolarsResult<Option<Series>> + Send + Sync,
@@ -805,6 +818,11 @@ where
     }
 }
 
+/// Analogous to [`Iterator::reduce`](std::iter::Iterator::reduce).
+///
+/// An accumulator is initialized to the series given by the first expression in `exprs`, and then each subsequent value
+/// of the accumulator is computed from `f(acc, next_expr_series)`. If `exprs` is empty, an error is returned when
+/// `collect` is called.
 pub fn reduce_exprs<F: 'static, E: AsRef<[Expr]>>(f: F, exprs: E) -> Expr
 where
     F: Fn(Series, Series) -> PolarsResult<Option<Series>> + Send + Sync + Clone,
@@ -941,7 +959,9 @@ where
     }
 }
 
-/// Get the the sum of the values per row
+/// Create a new column with the the sum of the values in each row.
+///
+/// The name of the resulting column will be `"sum"`; use [`alias`](Expr::alias) to choose a different name.
 pub fn sum_exprs<E: AsRef<[Expr]>>(exprs: E) -> Expr {
     let mut exprs = exprs.as_ref().to_vec();
     let func = |s1, s2| Ok(Some(&s1 + &s2));
@@ -953,7 +973,9 @@ pub fn sum_exprs<E: AsRef<[Expr]>>(exprs: E) -> Expr {
     fold_exprs(init, func, exprs).alias("sum")
 }
 
-/// Get the the maximum value per row
+/// Create a new column with the the maximum value per row.
+///
+/// The name of the resulting column will be `"max"`; use [`alias`](Expr::alias) to choose a different name.
 pub fn max_exprs<E: AsRef<[Expr]>>(exprs: E) -> Expr {
     let exprs = exprs.as_ref().to_vec();
     if exprs.is_empty() {
@@ -966,6 +988,9 @@ pub fn max_exprs<E: AsRef<[Expr]>>(exprs: E) -> Expr {
     reduce_exprs(func, exprs).alias("max")
 }
 
+/// Create a new column with the the minimum value per row.
+///
+/// The name of the resulting column will be `"min"`; use [`alias`](Expr::alias) to choose a different name.
 pub fn min_exprs<E: AsRef<[Expr]>>(exprs: E) -> Expr {
     let exprs = exprs.as_ref().to_vec();
     if exprs.is_empty() {
@@ -978,36 +1003,44 @@ pub fn min_exprs<E: AsRef<[Expr]>>(exprs: E) -> Expr {
     reduce_exprs(func, exprs).alias("min")
 }
 
-/// Evaluate all the expressions with a bitwise or
+/// Create a new column with the the bitwise-or of the elements in each row.
+///
+/// The name of the resulting column is arbitrary; use [`alias`](Expr::alias) to choose a different name.
 pub fn any_exprs<E: AsRef<[Expr]>>(exprs: E) -> Expr {
     let exprs = exprs.as_ref().to_vec();
     let func = |s1: Series, s2: Series| Ok(Some(s1.bool()?.bitor(s2.bool()?).into_series()));
     fold_exprs(lit(false), func, exprs)
 }
 
-/// Evaluate all the expressions with a bitwise and
+/// Create a new column with the the bitwise-and of the elements in each row.
+///
+/// The name of the resulting column is arbitrary; use [`alias`](Expr::alias) to choose a different name.
 pub fn all_exprs<E: AsRef<[Expr]>>(exprs: E) -> Expr {
     let exprs = exprs.as_ref().to_vec();
     let func = |s1: Series, s2: Series| Ok(Some(s1.bool()?.bitand(s2.bool()?).into_series()));
     fold_exprs(lit(true), func, exprs)
 }
 
-/// [Not](Expr::Not) expression.
+/// Negates a boolean column.
 pub fn not(expr: Expr) -> Expr {
     expr.not()
 }
 
-/// [IsNull](Expr::IsNotNull) expression
+/// A column which is `true` wherever `expr` is null, `false` elsewhere.
 pub fn is_null(expr: Expr) -> Expr {
     expr.is_null()
 }
 
-/// [IsNotNull](Expr::IsNotNull) expression.
+/// A column which is `false` wherever `expr` is null, `true` elsewhere.
 pub fn is_not_null(expr: Expr) -> Expr {
     expr.is_not_null()
 }
 
-/// [Cast](Expr::Cast) expression.
+/// Casts the column given by `Expr` to a different type.
+///
+/// Follows the rules of Rust casting, with the exception that integers and floats can be cast to `DataType::Date` and
+/// `DataType::DateTime(_, _)`. A column consisting entirely of of `Null` can be cast to any type, regardless of the
+/// nominal type of the column.
 pub fn cast(expr: Expr, data_type: DataType) -> Expr {
     Expr::Cast {
         expr: Box::new(expr),
@@ -1047,7 +1080,7 @@ pub fn range<T: Range<T>>(low: T, high: T) -> Expr {
 #[cfg(feature = "dtype-struct")]
 pub fn as_struct(exprs: &[Expr]) -> Expr {
     map_multiple(
-        |s| StructChunked::new("", s).map(|ca| Some(ca.into_series())),
+        |s| StructChunked::new(s[0].name(), s).map(|ca| Some(ca.into_series())),
         exprs,
         GetOutput::map_fields(|fld| Field::new(fld[0].name(), DataType::Struct(fld.to_vec()))),
     )
@@ -1058,7 +1091,9 @@ pub fn as_struct(exprs: &[Expr]) -> Expr {
     })
 }
 
-/// Repeat a literal `value` `n` times.
+/// Create a column of length `n` containing `n` copies of the literal `value`. Generally you won't need this function,
+/// as `lit(value)` already represents a column containing only `value` whose length is automatically set to the correct
+/// number of rows.
 pub fn repeat<L: Literal>(value: L, n_times: Expr) -> Expr {
     let function = |s: Series, n: Series| {
         let n = n.get(0).unwrap().extract::<usize>().ok_or_else(|| {
@@ -1083,7 +1118,9 @@ pub fn arg_where<E: Into<Expr>>(condition: E) -> Expr {
     }
 }
 
-/// Folds the expressions from left to right keeping the first no null values.
+/// Folds the expressions from left to right keeping the first non-null values.
+///
+/// It is an error to provide an empty `exprs`.
 pub fn coalesce(exprs: &[Expr]) -> Expr {
     let input = exprs.to_vec();
     Expr::Function {
@@ -1098,7 +1135,7 @@ pub fn coalesce(exprs: &[Expr]) -> Expr {
     }
 }
 
-///  Create a date range from a `start` and `stop` expression.
+/// Create a date range, named `name`, from a `start` and `stop` expression.
 #[cfg(feature = "temporal")]
 pub fn date_range(
     name: String,

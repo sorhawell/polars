@@ -1,9 +1,17 @@
 from __future__ import annotations
 
+import sys
 from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
+
+if sys.version_info >= (3, 9):
+    from zoneinfo import ZoneInfo
+else:
+    # Import from submodule due to typing issue with backports.zoneinfo package:
+    # https://github.com/pganssle/zoneinfo/issues/125
+    from backports.zoneinfo._zoneinfo import ZoneInfo
 
 import polars as pl
 from polars.testing import assert_frame_equal, assert_series_equal
@@ -408,30 +416,33 @@ def test_groupby_dynamic_flat_agg_4814() -> None:
     }
 
 
-def test_groupby_dynamic_overlapping_groups_flat_apply_multiple_5038() -> None:
-    every: str | timedelta
-    period: str | timedelta
-
-    for every, period in (  # type: ignore[assignment]
+@pytest.mark.parametrize(
+    ("every", "period"),
+    [
         ("10s", timedelta(seconds=100)),
         (timedelta(seconds=10), "100s"),
-    ):
-        assert (
-            pl.DataFrame(
-                {
-                    "a": [
-                        datetime(2021, 1, 1) + timedelta(seconds=2**i)
-                        for i in range(10)
-                    ],
-                    "b": [float(i) for i in range(10)],
-                }
-            )
-            .lazy()
-            .groupby_dynamic("a", every=every, period=period)
-            .agg([pl.col("b").var().sqrt().alias("corr")])
-        ).collect().sum().to_dict(False) == pytest.approx(
-            {"a": [None], "corr": [6.988674024215477]}
+    ],
+)
+@pytest.mark.parametrize("tzinfo", [None, ZoneInfo("Asia/Kathmandu")])
+def test_groupby_dynamic_overlapping_groups_flat_apply_multiple_5038(
+    every: str | timedelta, period: str | timedelta, tzinfo: ZoneInfo | None
+) -> None:
+    assert (
+        pl.DataFrame(
+            {
+                "a": [
+                    datetime(2021, 1, 1, tzinfo=tzinfo) + timedelta(seconds=2**i)
+                    for i in range(10)
+                ],
+                "b": [float(i) for i in range(10)],
+            }
         )
+        .lazy()
+        .groupby_dynamic("a", every=every, period=period)
+        .agg([pl.col("b").var().sqrt().alias("corr")])
+    ).collect().sum().to_dict(False) == pytest.approx(
+        {"a": [None], "corr": [6.988674024215477]}
+    )
 
 
 def test_take_in_groupby() -> None:
@@ -510,13 +521,15 @@ def test_groupby_when_then_with_binary_and_agg_in_pred_6202() -> None:
     }
 
 
-def test_groupby_dynamic_iter() -> None:
+@pytest.mark.parametrize("every", ["1h", timedelta(hours=1)])
+@pytest.mark.parametrize("tzinfo", [None, ZoneInfo("Asia/Kathmandu")])
+def test_groupby_dynamic_iter(every: str | timedelta, tzinfo: ZoneInfo | None) -> None:
     df = pl.DataFrame(
         {
             "datetime": [
-                datetime(2020, 1, 1, 10, 0),
-                datetime(2020, 1, 1, 10, 50),
-                datetime(2020, 1, 1, 11, 10),
+                datetime(2020, 1, 1, 10, 0, tzinfo=tzinfo),
+                datetime(2020, 1, 1, 10, 50, tzinfo=tzinfo),
+                datetime(2020, 1, 1, 11, 10, tzinfo=tzinfo),
             ],
             "a": [1, 2, 2],
             "b": [4, 5, 6],
@@ -526,11 +539,11 @@ def test_groupby_dynamic_iter() -> None:
     # Without 'by' argument
     result1 = [
         (name, data.shape)
-        for name, data in df.groupby_dynamic("datetime", every="1h", closed="left")
+        for name, data in df.groupby_dynamic("datetime", every=every, closed="left")
     ]
     expected1 = [
-        (datetime(2020, 1, 1, 10), (2, 3)),
-        (datetime(2020, 1, 1, 11), (1, 3)),
+        (datetime(2020, 1, 1, 10, tzinfo=tzinfo), (2, 3)),
+        (datetime(2020, 1, 1, 11, tzinfo=tzinfo), (1, 3)),
     ]
     assert result1 == expected1
 
@@ -538,15 +551,57 @@ def test_groupby_dynamic_iter() -> None:
     result2 = [
         (name, data.shape)
         for name, data in df.groupby_dynamic(
-            "datetime", every="1h", closed="left", by="a"
+            "datetime", every=every, closed="left", by="a"
         )
     ]
     expected2 = [
-        ((1, datetime(2020, 1, 1, 10)), (1, 3)),
-        ((2, datetime(2020, 1, 1, 10)), (1, 3)),
-        ((2, datetime(2020, 1, 1, 11)), (1, 3)),
+        ((1, datetime(2020, 1, 1, 10, tzinfo=tzinfo)), (1, 3)),
+        ((2, datetime(2020, 1, 1, 10, tzinfo=tzinfo)), (1, 3)),
+        ((2, datetime(2020, 1, 1, 11, tzinfo=tzinfo)), (1, 3)),
     ]
     assert result2 == expected2
+
+
+@pytest.mark.parametrize("every", ["1h", timedelta(hours=1)])
+@pytest.mark.parametrize("tzinfo", [None, ZoneInfo("Asia/Kathmandu")])
+def test_groupby_dynamic_lazy(every: str | timedelta, tzinfo: ZoneInfo | None) -> None:
+    ldf = pl.LazyFrame(
+        {
+            "time": pl.date_range(
+                low=datetime(2021, 12, 16, tzinfo=tzinfo),
+                high=datetime(2021, 12, 16, 2, tzinfo=tzinfo),
+                interval="30m",
+            ),
+            "n": range(5),
+        }
+    )
+    df = (
+        ldf.groupby_dynamic("time", every=every, closed="right")
+        .agg(
+            [
+                pl.col("time").min().alias("time_min"),
+                pl.col("time").max().alias("time_max"),
+            ]
+        )
+        .collect()
+    )
+    assert sorted(df.rows()) == [
+        (
+            datetime(2021, 12, 15, 23, 0, tzinfo=tzinfo),
+            datetime(2021, 12, 16, 0, 0, tzinfo=tzinfo),
+            datetime(2021, 12, 16, 0, 0, tzinfo=tzinfo),
+        ),
+        (
+            datetime(2021, 12, 16, 0, 0, tzinfo=tzinfo),
+            datetime(2021, 12, 16, 0, 30, tzinfo=tzinfo),
+            datetime(2021, 12, 16, 1, 0, tzinfo=tzinfo),
+        ),
+        (
+            datetime(2021, 12, 16, 1, 0, tzinfo=tzinfo),
+            datetime(2021, 12, 16, 1, 30, tzinfo=tzinfo),
+            datetime(2021, 12, 16, 2, 0, tzinfo=tzinfo),
+        ),
+    ]
 
 
 @pytest.mark.slow()
@@ -563,12 +618,16 @@ def test_overflow_mean_partitioned_groupby_5194(dtype: pl.PolarsDataType) -> Non
     ) == {"group": [1, 2], "data": [10000000.0, 10000000.0]}
 
 
-def test_groupby_dynamic_elementwise_following_mean_agg_6904() -> None:
+@pytest.mark.parametrize("tzinfo", [None, ZoneInfo("Asia/Kathmandu")])
+def test_groupby_dynamic_elementwise_following_mean_agg_6904(
+    tzinfo: ZoneInfo | None,
+) -> None:
     df = (
         pl.DataFrame(
             {
                 "a": [
-                    datetime(2021, 1, 1) + timedelta(seconds=2**i) for i in range(5)
+                    datetime(2021, 1, 1, tzinfo=tzinfo) + timedelta(seconds=2**i)
+                    for i in range(5)
                 ],
                 "b": [float(i) for i in range(5)],
             }
@@ -582,8 +641,29 @@ def test_groupby_dynamic_elementwise_following_mean_agg_6904() -> None:
         df,
         pl.DataFrame(
             {
-                "a": [datetime(2021, 1, 1, 0, 0), datetime(2021, 1, 1, 0, 0, 10)],
+                "a": [
+                    datetime(2021, 1, 1, 0, 0, tzinfo=tzinfo),
+                    datetime(2021, 1, 1, 0, 0, 10, tzinfo=tzinfo),
+                ],
                 "c": [0.9092974268256817, -0.7568024953079282],
             }
         ),
     )
+
+
+def test_groupby_multiple_column_reference() -> None:
+    # Issue #7181
+    df = pl.DataFrame(
+        {
+            "gr": ["a", "b", "a", "b", "a", "b"],
+            "val": [1, 20, 100, 2000, 10000, 200000],
+        }
+    )
+    res = df.groupby("gr").agg(
+        pl.col("val") + pl.col("val").shift().fill_null(0),
+    )
+
+    assert res.sort("gr").to_dict(False) == {
+        "gr": ["a", "b"],
+        "val": [[1, 101, 10100], [20, 2020, 202000]],
+    }

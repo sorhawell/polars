@@ -4,11 +4,13 @@ import contextlib
 import math
 import os
 import typing
+import warnings
 from datetime import date, datetime, time, timedelta
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
+    Iterable,
     NoReturn,
     Sequence,
     Union,
@@ -30,7 +32,6 @@ from polars.datatypes import (
     Int64,
     List,
     Object,
-    PolarsDataType,
     Time,
     UInt8,
     UInt16,
@@ -93,6 +94,7 @@ with contextlib.suppress(ImportError):  # Module not available when building doc
 if TYPE_CHECKING:
     import sys
 
+    from polars.datatypes import OneOrMoreDataTypes, PolarsDataType
     from polars.internals.series._numpy import SeriesView
     from polars.internals.type_aliases import (
         ClosedInterval,
@@ -1415,6 +1417,99 @@ class Series:
         """
         return pli.wrap_df(self._s.to_dummies(separator))
 
+    def cut(
+        self,
+        bins: list[float],
+        labels: list[str] | None = None,
+        break_point_label: str = "break_point",
+        category_label: str = "category",
+    ) -> pli.DataFrame:
+        """
+        Bin values into discrete values.
+
+        Parameters
+        ----------
+        bins
+            Bins to create.
+        labels
+            Labels to assign to the bins. If given the length of labels must be
+            len(bins) + 1.
+        break_point_label
+            Name given to the breakpoint column.
+        category_label
+            Name given to the category column.
+
+        Returns
+        -------
+        DataFrame
+
+        Warnings
+        --------
+        This functionality is experimental and may change without it being considered a
+        breaking change.
+
+        Examples
+        --------
+        >>> a = pl.Series("a", [v / 10 for v in range(-30, 30, 5)])
+        >>> a.cut(bins=[-1, 1])
+        shape: (12, 3)
+        ┌──────┬─────────────┬──────────────┐
+        │ a    ┆ break_point ┆ category     │
+        │ ---  ┆ ---         ┆ ---          │
+        │ f64  ┆ f64         ┆ cat          │
+        ╞══════╪═════════════╪══════════════╡
+        │ -3.0 ┆ -1.0        ┆ (-inf, -1.0] │
+        │ -2.5 ┆ -1.0        ┆ (-inf, -1.0] │
+        │ -2.0 ┆ -1.0        ┆ (-inf, -1.0] │
+        │ -1.5 ┆ -1.0        ┆ (-inf, -1.0] │
+        │ ...  ┆ ...         ┆ ...          │
+        │ 1.0  ┆ 1.0         ┆ (-1.0, 1.0]  │
+        │ 1.5  ┆ inf         ┆ (1.0, inf]   │
+        │ 2.0  ┆ inf         ┆ (1.0, inf]   │
+        │ 2.5  ┆ inf         ┆ (1.0, inf]   │
+        └──────┴─────────────┴──────────────┘
+
+        """
+        var_nm = self.name
+
+        cuts_df = pli.DataFrame(
+            [
+                pli.Series(
+                    name=break_point_label, values=bins, dtype=Float64
+                ).extend_constant(float("inf"), 1)
+            ]
+        )
+
+        if labels:
+            if len(labels) != len(bins) + 1:
+                raise ValueError("expected more labels")
+            cuts_df = cuts_df.with_columns(
+                pli.Series(name=category_label, values=labels)
+            )
+        else:
+            cuts_df = cuts_df.with_columns(
+                pli.format(
+                    "({}, {}]",
+                    pli.col(break_point_label).shift_and_fill(1, float("-inf")),
+                    pli.col(break_point_label),
+                ).alias(category_label)
+            )
+
+        cuts_df = cuts_df.with_columns(pli.col(category_label).cast(Categorical))
+
+        result = (
+            self.cast(Float64)
+            .sort()
+            .to_frame()
+            .join_asof(
+                cuts_df,
+                left_on=var_nm,
+                right_on=break_point_label,
+                strategy="forward",
+            )
+        )
+        return result
+
     def value_counts(self, sort: bool = False) -> pli.DataFrame:
         """
         Count the unique values in a Series.
@@ -2048,6 +2143,12 @@ class Series:
             Place null values last instead of first.
 
         """
+        warnings.warn(
+            "`Series.argsort()` is deprecated in favor of `Series.arg_sort()`",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self.arg_sort(descending, nulls_last)
 
     def arg_unique(self) -> Series:
         """
@@ -2779,9 +2880,7 @@ class Series:
             Float64,
         )
 
-    def is_temporal(
-        self, excluding: PolarsDataType | Sequence[PolarsDataType] | None = None
-    ) -> bool:
+    def is_temporal(self, excluding: OneOrMoreDataTypes | None = None) -> bool:
         """
         Check if this Series datatype is temporal.
 
@@ -2801,7 +2900,7 @@ class Series:
 
         """
         if excluding is not None:
-            if not isinstance(excluding, Sequence):
+            if not isinstance(excluding, Iterable):
                 excluding = [excluding]
             if self.dtype in excluding:
                 return False
@@ -3219,6 +3318,8 @@ class Series:
         ]
 
         """
+        if n == 0:
+            return wrap_s(self._s.clear())
         s = (
             self.__class__(name=self.name, values=[], dtype=self.dtype)
             if len(self) > 0

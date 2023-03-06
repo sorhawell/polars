@@ -4,8 +4,9 @@ import contextlib
 import os
 import subprocess
 import typing
+import warnings
 from datetime import date, datetime, time, timedelta
-from io import BytesIO, IOBase, StringIO
+from io import BytesIO, StringIO
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -33,9 +34,6 @@ from polars.datatypes import (
     Int16,
     Int32,
     Int64,
-    PolarsDataType,
-    SchemaDefinition,
-    SchemaDict,
     Time,
     UInt8,
     UInt16,
@@ -64,9 +62,11 @@ with contextlib.suppress(ImportError):  # Module not available when building doc
 
 if TYPE_CHECKING:
     import sys
+    from io import IOBase
 
     import pyarrow as pa
 
+    from polars.datatypes import PolarsDataType, SchemaDefinition, SchemaDict
     from polars.internals.type_aliases import (
         AsofJoinStrategy,
         ClosedInterval,
@@ -151,7 +151,7 @@ class LazyFrame:
 
     Notes
     -----
-    Initialising ``LazyFrame`` is equivalent to ``DataFrame(...).lazy()``.
+    Initialising ``LazyFrame(...)`` directly is equivalent to ``DataFrame(...).lazy()``.
 
     Examples
     --------
@@ -653,9 +653,9 @@ class LazyFrame:
 
     def __str__(self) -> str:
         return f"""\
-naive plan: (run LazyFrame.describe_optimized_plan() to see the optimized plan)
+naive plan: (run LazyFrame.explain(optimized=True) to see the optimized plan)
 
-{self.describe_plan()}\
+{self.explain(optimized=False)}\
 """
 
     def __repr__(self) -> str:
@@ -673,10 +673,10 @@ naive plan: (run LazyFrame.describe_optimized_plan() to see the optimized plan)
                 f" the optimized version</p>{svg.decode()}"
             )
         except Exception:
-            insert = self.describe_plan().replace("\n", "<p></p>")
+            insert = self.explain(optimized=False).replace("\n", "<p></p>")
 
             return f"""\
-<i>naive plan: (run <b>LazyFrame.describe_optimized_plan()</b> to see the optimized plan)</i>
+<i>naive plan: (run <b>LazyFrame.explain(optimized=True)</b> to see the optimized plan)</i>
     <p></p>
     <div>{insert}</div>\
 """
@@ -795,16 +795,110 @@ naive plan: (run LazyFrame.describe_optimized_plan() to see the optimized plan)
         """
         return func(self, *args, **kwargs)
 
-    def describe_plan(self, *, optimized: bool = False) -> str:
+    def explain(
+        self,
+        *,
+        optimized: bool = True,
+        type_coercion: bool = True,
+        predicate_pushdown: bool = True,
+        projection_pushdown: bool = True,
+        simplify_expression: bool = True,
+        slice_pushdown: bool = True,
+        common_subplan_elimination: bool = True,
+        streaming: bool = False,
+    ) -> str:
+        """
+        Create a string representation of the query plan.
+
+        Different optimizations can be turned on or off.
+
+        Parameters
+        ----------
+        optimized
+            Return an optimized query plan. Defaults to ``False``.
+            If this is set to ``True`` the subsequent
+            optimization flags control which optimizations
+            run.
+        type_coercion
+            Do type coercion optimization.
+        predicate_pushdown
+            Do predicate pushdown optimization.
+        projection_pushdown
+            Do projection pushdown optimization.
+        simplify_expression
+            Run simplify expressions optimization.
+        slice_pushdown
+            Slice pushdown optimization.
+        common_subplan_elimination
+            Will try to cache branching subplans that occur on self-joins or unions.
+        streaming
+            Run parts of the query in a streaming fashion (this is in an alpha state)
+
+        Examples
+        --------
+        >>> df = pl.DataFrame(
+        ...     {
+        ...         "a": ["a", "b", "a", "b", "b", "c"],
+        ...         "b": [1, 2, 3, 4, 5, 6],
+        ...         "c": [6, 5, 4, 3, 2, 1],
+        ...     }
+        ... ).lazy()
+        >>> df.groupby("a", maintain_order=True).agg(pl.all().sum()).sort(
+        ...     "a"
+        ... ).explain()  # doctest: +SKIP
+        """
+        if optimized:
+            ldf = self._ldf.optimization_toggle(
+                type_coercion,
+                predicate_pushdown,
+                projection_pushdown,
+                simplify_expression,
+                slice_pushdown,
+                common_subplan_elimination,
+                streaming,
+            )
+            return ldf.describe_optimized_plan()
+        return self._ldf.describe_plan()
+
+    def describe_plan(
+        self,
+        *,
+        optimized: bool = False,
+        type_coercion: bool = True,
+        predicate_pushdown: bool = True,
+        projection_pushdown: bool = True,
+        simplify_expression: bool = True,
+        slice_pushdown: bool = True,
+        common_subplan_elimination: bool = True,
+        streaming: bool = False,
+    ) -> str:
         """
         Create a string representation of the unoptimized query plan.
 
         Parameters
         ----------
         optimized
-            Return an optimized query plan. Defaults to `False`.
-            Use ``describe_optimized_plan`` to control
-            the optimization flags.
+            Return an optimized query plan. Defaults to ``False``.
+            If this is set to ``True`` the subsequent
+            optimization flags control which optimizations
+            run.
+        type_coercion
+            Do type coercion optimization.
+        predicate_pushdown
+            Do predicate pushdown optimization.
+        projection_pushdown
+            Do projection pushdown optimization.
+        simplify_expression
+            Run simplify expressions optimization.
+        slice_pushdown
+            Slice pushdown optimization.
+        common_subplan_elimination
+            Will try to cache branching subplans that occur on self-joins or unions.
+        streaming
+            Run parts of the query in a streaming fashion (this is in an alpha state)
+
+        .. deprecated:: 0.16.10
+            Use ``LazyFrame.explain``
 
         Examples
         --------
@@ -820,8 +914,22 @@ naive plan: (run LazyFrame.describe_optimized_plan() to see the optimized plan)
         ... ).describe_plan()  # doctest: +SKIP
 
         """
+        warnings.warn(
+            "`LazyFrame.describe_plan` has been deprecated; Please use `LazyFrame.explain` instead",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
         if optimized:
-            return self._ldf.describe_optimized_plan()
+            ldf = self._ldf.optimization_toggle(
+                type_coercion,
+                predicate_pushdown,
+                projection_pushdown,
+                simplify_expression,
+                slice_pushdown,
+                common_subplan_elimination,
+                streaming,
+            )
+            return ldf.describe_optimized_plan()
         return self._ldf.describe_plan()
 
     @deprecate_nonkeyword_arguments()
@@ -836,6 +944,11 @@ naive plan: (run LazyFrame.describe_optimized_plan() to see the optimized plan)
         streaming: bool = False,
     ) -> str:
         """Create a string representation of the optimized query plan."""
+        warnings.warn(
+            "`LazyFrame.describe_optimized_plan` has been deprecated; Please use `LazyFrame.explain` instead",
+            category=DeprecationWarning,
+            stacklevel=2,
+        )
         ldf = self._ldf.optimization_toggle(
             type_coercion,
             predicate_pushdown,
@@ -1006,7 +1119,7 @@ naive plan: (run LazyFrame.describe_optimized_plan() to see the optimized plan)
             Sort in descending order. When sorting by multiple columns, can be specified
             per column by passing a sequence of booleans.
         nulls_last
-            Place null values last. Can only be used when sorting by a single column.
+            Place null values last.
 
         Examples
         --------
@@ -1081,12 +1194,6 @@ naive plan: (run LazyFrame.describe_optimized_plan() to see the optimized plan)
         by = pli.selection_to_pyexpr_list(by)
         if more_by:
             by.extend(pli.selection_to_pyexpr_list(more_by))
-
-        # TODO: Do this check on the Rust side
-        if nulls_last and len(by) > 1:
-            raise ValueError(
-                "`nulls_last=True` only works when sorting by a single column"
-            )
 
         if isinstance(descending, bool):
             descending = [descending]
@@ -1839,11 +1946,10 @@ naive plan: (run LazyFrame.describe_optimized_plan() to see the optimized plan)
         Expressions with multiple outputs can be automatically instantiated as Structs
         by enabling the experimental setting ``Config.set_auto_structify(True)``:
 
-        >>> from polars.datatypes import INTEGER_DTYPES
         >>> with pl.Config() as cfg:
         ...     cfg.set_auto_structify(True)  # doctest: +IGNORE_RESULT
         ...     ldf.select(
-        ...         is_odd=(pl.col(INTEGER_DTYPES) % 2).suffix("_is_odd"),
+        ...         is_odd=(pl.col(pl.INTEGER_DTYPES) % 2).suffix("_is_odd"),
         ...     ).collect()
         ...
         shape: (3, 1)
@@ -2079,7 +2185,7 @@ naive plan: (run LazyFrame.describe_optimized_plan() to see the optimized plan)
 
         """
         if offset is None:
-            offset = f"-{period}"
+            offset = f"-{_timedelta_to_pl_duration(period)}"
 
         pyexprs_by = [] if by is None else selection_to_pyexpr_list(by)
         period = _timedelta_to_pl_duration(period)
@@ -2369,7 +2475,7 @@ naive plan: (run LazyFrame.describe_optimized_plan() to see the optimized plan)
 
         """  # noqa: W505
         if offset is None:
-            offset = f"-{every}" if period is None else "0ns"
+            offset = f"-{_timedelta_to_pl_duration(every)}" if period is None else "0ns"
 
         if period is None:
             period = every
@@ -4217,37 +4323,34 @@ naive plan: (run LazyFrame.describe_optimized_plan() to see the optimized plan)
         """
         return self.select(pli.col("*").interpolate())
 
-    def unnest(self, names: str | list[str]) -> Self:
+    @deprecated_alias(names="columns")
+    def unnest(self, columns: str | Sequence[str], *more_columns: str) -> Self:
         """
-        Decompose a struct into its fields.
+        Decompose struct columns into separate columns for each of their fields.
 
-        The fields will be inserted into the `DataFrame` on the location of the
-        `struct` type.
+        The new columns will be inserted into the dataframe at the location of the
+        struct column.
 
         Parameters
         ----------
-        names
-           Names of the struct columns that will be decomposed by its fields
+        columns
+            Name of the struct column(s) that should be unnested.
+        *more_columns
+            Additional columns to unnest, specified as positional arguments.
 
         Examples
         --------
-        >>> df = (
-        ...     pl.DataFrame(
-        ...         {
-        ...             "before": ["foo", "bar"],
-        ...             "t_a": [1, 2],
-        ...             "t_b": ["a", "b"],
-        ...             "t_c": [True, None],
-        ...             "t_d": [[1, 2], [3]],
-        ...             "after": ["baz", "womp"],
-        ...         }
-        ...     )
-        ...     .lazy()
-        ...     .select(
-        ...         ["before", pl.struct(pl.col("^t_.$")).alias("t_struct"), "after"]
-        ...     )
-        ... )
-        >>> df.fetch()
+        >>> df = pl.LazyFrame(
+        ...     {
+        ...         "before": ["foo", "bar"],
+        ...         "t_a": [1, 2],
+        ...         "t_b": ["a", "b"],
+        ...         "t_c": [True, None],
+        ...         "t_d": [[1, 2], [3]],
+        ...         "after": ["baz", "womp"],
+        ...     }
+        ... ).select("before", pl.struct(pl.col("^t_.$")).alias("t_struct"), "after")
+        >>> df.collect()
         shape: (2, 3)
         ┌────────┬─────────────────────┬───────┐
         │ before ┆ t_struct            ┆ after │
@@ -4257,7 +4360,7 @@ naive plan: (run LazyFrame.describe_optimized_plan() to see the optimized plan)
         │ foo    ┆ {1,"a",true,[1, 2]} ┆ baz   │
         │ bar    ┆ {2,"b",null,[3]}    ┆ womp  │
         └────────┴─────────────────────┴───────┘
-        >>> df.unnest("t_struct").fetch()
+        >>> df.unnest("t_struct").collect()
         shape: (2, 6)
         ┌────────┬─────┬─────┬──────┬───────────┬───────┐
         │ before ┆ t_a ┆ t_b ┆ t_c  ┆ t_d       ┆ after │
@@ -4269,9 +4372,12 @@ naive plan: (run LazyFrame.describe_optimized_plan() to see the optimized plan)
         └────────┴─────┴─────┴──────┴───────────┴───────┘
 
         """
-        if isinstance(names, str):
-            names = [names]
-        return self._from_pyldf(self._ldf.unnest(names))
+        if isinstance(columns, str):
+            columns = [columns]
+        if more_columns:
+            columns = list(columns)
+            columns.extend(more_columns)
+        return self._from_pyldf(self._ldf.unnest(columns))
 
     def merge_sorted(self, other: LazyFrame, key: str) -> Self:
         """
