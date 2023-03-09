@@ -1435,9 +1435,7 @@ def coerce_arrow(array: pa.Array, rechunk: bool = True) -> pa.Array:
             or pa.types.is_uint16(array.type.index_type)
             or pa.types.is_int32(array.type.index_type)
         ):
-            array = pc.cast(
-                array, pa.dictionary(pa.uint32(), pa.large_string())
-            )
-            
+            array = pc.cast(array, pa.dictionary(pa.uint32(), pa.large_string()))
+
         array.combine_chunks()
     return array
