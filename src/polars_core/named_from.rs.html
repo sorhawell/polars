@@ -465,16 +465,6 @@
 <a href="#465" id="465">465</a>
 <a href="#466" id="466">466</a>
 <a href="#467" id="467">467</a>
-<a href="#468" id="468">468</a>
-<a href="#469" id="469">469</a>
-<a href="#470" id="470">470</a>
-<a href="#471" id="471">471</a>
-<a href="#472" id="472">472</a>
-<a href="#473" id="473">473</a>
-<a href="#474" id="474">474</a>
-<a href="#475" id="475">475</a>
-<a href="#476" id="476">476</a>
-<a href="#477" id="477">477</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::borrow::Cow;
 
 <span class="attr">#[cfg(feature = <span class="string">&quot;dtype-duration&quot;</span>)]
@@ -540,8 +530,7 @@
 }
 
 <span class="macro">impl_named_from!</span>([String], Utf8Type, from_slice);
-<span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-</span><span class="macro">impl_named_from!</span>([Vec&lt;u8&gt;], BinaryType, from_slice);
+<span class="macro">impl_named_from!</span>([Vec&lt;u8&gt;], BinaryType, from_slice);
 <span class="macro">impl_named_from!</span>([bool], BooleanType, from_slice);
 <span class="attr">#[cfg(feature = <span class="string">&quot;dtype-u8&quot;</span>)]
 </span><span class="macro">impl_named_from!</span>([u8], UInt8Type, from_slice);
@@ -558,8 +547,7 @@
 <span class="macro">impl_named_from!</span>([f32], Float32Type, from_slice);
 <span class="macro">impl_named_from!</span>([f64], Float64Type, from_slice);
 <span class="macro">impl_named_from!</span>([<span class="prelude-ty">Option</span>&lt;String&gt;], Utf8Type, from_slice_options);
-<span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-</span><span class="macro">impl_named_from!</span>([<span class="prelude-ty">Option</span>&lt;Vec&lt;u8&gt;&gt;], BinaryType, from_slice_options);
+<span class="macro">impl_named_from!</span>([<span class="prelude-ty">Option</span>&lt;Vec&lt;u8&gt;&gt;], BinaryType, from_slice_options);
 <span class="macro">impl_named_from!</span>([<span class="prelude-ty">Option</span>&lt;bool&gt;], BooleanType, from_slice_options);
 <span class="attr">#[cfg(feature = <span class="string">&quot;dtype-u8&quot;</span>)]
 </span><span class="macro">impl_named_from!</span>([<span class="prelude-ty">Option</span>&lt;u8&gt;], UInt8Type, from_slice_options);
@@ -706,58 +694,50 @@
     }
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-</span><span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T: AsRef&lt;[<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]]&gt;&gt; NamedFrom&lt;T, [<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]]&gt; <span class="kw">for </span>Series {
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T: AsRef&lt;[<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]]&gt;&gt; NamedFrom&lt;T, [<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]]&gt; <span class="kw">for </span>Series {
     <span class="kw">fn </span>new(name: <span class="kw-2">&amp;</span>str, v: T) -&gt; <span class="self">Self </span>{
         BinaryChunked::from_slice(name, v.as_ref()).into_series()
     }
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-</span><span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T: AsRef&lt;[<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]]&gt;&gt; NamedFrom&lt;T, [<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]]&gt; <span class="kw">for </span>BinaryChunked {
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T: AsRef&lt;[<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]]&gt;&gt; NamedFrom&lt;T, [<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]]&gt; <span class="kw">for </span>BinaryChunked {
     <span class="kw">fn </span>new(name: <span class="kw-2">&amp;</span>str, v: T) -&gt; <span class="self">Self </span>{
         BinaryChunked::from_slice(name, v.as_ref())
     }
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-</span><span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T: AsRef&lt;[<span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]&gt;]&gt;&gt; NamedFrom&lt;T, [<span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]&gt;]&gt; <span class="kw">for </span>Series {
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T: AsRef&lt;[<span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]&gt;]&gt;&gt; NamedFrom&lt;T, [<span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]&gt;]&gt; <span class="kw">for </span>Series {
     <span class="kw">fn </span>new(name: <span class="kw-2">&amp;</span>str, v: T) -&gt; <span class="self">Self </span>{
         BinaryChunked::from_slice_options(name, v.as_ref()).into_series()
     }
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-</span><span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T: AsRef&lt;[<span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]&gt;]&gt;&gt; NamedFrom&lt;T, [<span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]&gt;]&gt; <span class="kw">for </span>BinaryChunked {
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T: AsRef&lt;[<span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]&gt;]&gt;&gt; NamedFrom&lt;T, [<span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]&gt;]&gt; <span class="kw">for </span>BinaryChunked {
     <span class="kw">fn </span>new(name: <span class="kw-2">&amp;</span>str, v: T) -&gt; <span class="self">Self </span>{
         BinaryChunked::from_slice_options(name, v.as_ref())
     }
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-</span><span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T: AsRef&lt;[Cow&lt;<span class="lifetime">&#39;a</span>, [u8]&gt;]&gt;&gt; NamedFrom&lt;T, [Cow&lt;<span class="lifetime">&#39;a</span>, [u8]&gt;]&gt; <span class="kw">for </span>Series {
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T: AsRef&lt;[Cow&lt;<span class="lifetime">&#39;a</span>, [u8]&gt;]&gt;&gt; NamedFrom&lt;T, [Cow&lt;<span class="lifetime">&#39;a</span>, [u8]&gt;]&gt; <span class="kw">for </span>Series {
     <span class="kw">fn </span>new(name: <span class="kw-2">&amp;</span>str, v: T) -&gt; <span class="self">Self </span>{
         BinaryChunked::from_iter_values(name, v.as_ref().iter().map(|value| value.as_ref()))
             .into_series()
     }
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-</span><span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T: AsRef&lt;[Cow&lt;<span class="lifetime">&#39;a</span>, [u8]&gt;]&gt;&gt; NamedFrom&lt;T, [Cow&lt;<span class="lifetime">&#39;a</span>, [u8]&gt;]&gt; <span class="kw">for </span>BinaryChunked {
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T: AsRef&lt;[Cow&lt;<span class="lifetime">&#39;a</span>, [u8]&gt;]&gt;&gt; NamedFrom&lt;T, [Cow&lt;<span class="lifetime">&#39;a</span>, [u8]&gt;]&gt; <span class="kw">for </span>BinaryChunked {
     <span class="kw">fn </span>new(name: <span class="kw-2">&amp;</span>str, v: T) -&gt; <span class="self">Self </span>{
         BinaryChunked::from_iter_values(name, v.as_ref().iter().map(|value| value.as_ref()))
     }
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-</span><span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T: AsRef&lt;[<span class="prelude-ty">Option</span>&lt;Cow&lt;<span class="lifetime">&#39;a</span>, [u8]&gt;&gt;]&gt;&gt; NamedFrom&lt;T, [<span class="prelude-ty">Option</span>&lt;Cow&lt;<span class="lifetime">&#39;a</span>, [u8]&gt;&gt;]&gt; <span class="kw">for </span>Series {
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T: AsRef&lt;[<span class="prelude-ty">Option</span>&lt;Cow&lt;<span class="lifetime">&#39;a</span>, [u8]&gt;&gt;]&gt;&gt; NamedFrom&lt;T, [<span class="prelude-ty">Option</span>&lt;Cow&lt;<span class="lifetime">&#39;a</span>, [u8]&gt;&gt;]&gt; <span class="kw">for </span>Series {
     <span class="kw">fn </span>new(name: <span class="kw-2">&amp;</span>str, v: T) -&gt; <span class="self">Self </span>{
         BinaryChunked::new(name, v).into_series()
     }
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-</span><span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T: AsRef&lt;[<span class="prelude-ty">Option</span>&lt;Cow&lt;<span class="lifetime">&#39;a</span>, [u8]&gt;&gt;]&gt;&gt; NamedFrom&lt;T, [<span class="prelude-ty">Option</span>&lt;Cow&lt;<span class="lifetime">&#39;a</span>, [u8]&gt;&gt;]&gt;
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, T: AsRef&lt;[<span class="prelude-ty">Option</span>&lt;Cow&lt;<span class="lifetime">&#39;a</span>, [u8]&gt;&gt;]&gt;&gt; NamedFrom&lt;T, [<span class="prelude-ty">Option</span>&lt;Cow&lt;<span class="lifetime">&#39;a</span>, [u8]&gt;&gt;]&gt;
     <span class="kw">for </span>BinaryChunked
 {
     <span class="kw">fn </span>new(name: <span class="kw-2">&amp;</span>str, v: T) -&gt; <span class="self">Self </span>{

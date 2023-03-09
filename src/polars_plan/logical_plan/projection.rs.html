@@ -434,11 +434,6 @@
 <a href="#434" id="434">434</a>
 <a href="#435" id="435">435</a>
 <a href="#436" id="436">436</a>
-<a href="#437" id="437">437</a>
-<a href="#438" id="438">438</a>
-<a href="#439" id="439">439</a>
-<a href="#440" id="440">440</a>
-<a href="#441" id="441">441</a>
 </pre><pre class="rust"><code><span class="doccomment">//! this contains code used for rewriting projections, expanding wildcards, regex selection etc.
 </span><span class="kw">use </span>polars_arrow::index::IndexToUsize;
 <span class="kw">use </span>polars_core::utils::get_supertype;
@@ -613,13 +608,8 @@
         <span class="kw">let </span>new_expr = rewrite_special_aliases(new_expr)<span class="question-mark">?</span>;
         result.push(new_expr)
     }
-    <span class="kw">if </span>is_valid {
-        <span class="prelude-val">Ok</span>(())
-    } <span class="kw">else </span>{
-        <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-            <span class="string">&quot;Expanding more than one `col` is not yet allowed.&quot;</span>.into(),
-        ))
-    }
+    <span class="macro">polars_ensure!</span>(is_valid, ComputeError: <span class="string">&quot;expanding more than one `col` is not allowed&quot;</span>);
+    <span class="prelude-val">Ok</span>(())
 }
 
 <span class="doccomment">/// This replaces the dtypes Expr with a Column Expr. It also removes the Exclude Expr from the

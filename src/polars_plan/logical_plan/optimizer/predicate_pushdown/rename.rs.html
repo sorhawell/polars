@@ -60,7 +60,11 @@
 <a href="#60" id="60">60</a>
 <a href="#61" id="61">61</a>
 <a href="#62" id="62">62</a>
-</pre><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href="#63" id="63">63</a>
+<a href="#64" id="64">64</a>
+</pre><pre class="rust"><code><span class="kw">use </span>smartstring::alias::String <span class="kw">as </span>SmartString;
+
+<span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::prelude::optimizer::predicate_pushdown::keys::{key_has_name, predicate_to_key};
 
 <span class="kw">fn </span>remove_any_key_referencing_renamed(
@@ -83,8 +87,8 @@
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>process_rename(
     acc_predicates: <span class="kw-2">&amp;mut </span>PlHashMap&lt;Arc&lt;str&gt;, Node&gt;,
     expr_arena: <span class="kw-2">&amp;mut </span>Arena&lt;AExpr&gt;,
-    existing: <span class="kw-2">&amp;</span>[String],
-    new: <span class="kw-2">&amp;</span>[String],
+    existing: <span class="kw-2">&amp;</span>[SmartString],
+    new: <span class="kw-2">&amp;</span>[SmartString],
 ) -&gt; PolarsResult&lt;Vec&lt;Node&gt;&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>local_predicates = <span class="macro">vec!</span>[];
     <span class="kw">for </span>(existing, new) <span class="kw">in </span>existing.iter().zip(new.iter()) {

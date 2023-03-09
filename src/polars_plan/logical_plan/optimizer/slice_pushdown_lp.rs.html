@@ -674,8 +674,8 @@
             <span class="comment">// other blocking nodes
             </span>| m @ (DataFrameScan {..}, <span class="kw">_</span>)
             | m @ (Sort {..}, <span class="kw">_</span>)
-            | m @ (Explode {..}, <span class="kw">_</span>)
-            | m @ (Melt {..}, <span class="kw">_</span>)
+            | m @ (MapFunction {function: FunctionNode::Explode {..}, ..}, <span class="kw">_</span>)
+            | m @ (MapFunction {function: FunctionNode::Melt {..}, ..}, <span class="kw">_</span>)
             | m @ (Cache {..}, <span class="kw">_</span>)
             | m @ (Distinct {..}, <span class="kw">_</span>)
             | m @ (HStack {..},<span class="kw">_</span>)

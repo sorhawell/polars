@@ -696,11 +696,6 @@
 <a href="#696" id="696">696</a>
 <a href="#697" id="697">697</a>
 <a href="#698" id="698">698</a>
-<a href="#699" id="699">699</a>
-<a href="#700" id="700">700</a>
-<a href="#701" id="701">701</a>
-<a href="#702" id="702">702</a>
-<a href="#703" id="703">703</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::borrow::Borrow;
 <span class="kw">use </span>std::fmt::Debug;
 
@@ -811,11 +806,9 @@
         <span class="kw">let </span>has_nulls = schema
             .iter_dtypes()
             .any(|dtype| <span class="macro">matches!</span>(dtype, DataType::Null));
-        <span class="kw">if </span>has_nulls {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                <span class="string">&quot;Could not infer row types, because of the null values&quot;</span>.into(),
-            ));
-        }
+        <span class="macro">polars_ensure!</span>(
+            !has_nulls, ComputeError: <span class="string">&quot;unable to infer row types because of null values&quot;
+        </span>);
         <span class="self">Self</span>::from_rows_and_schema(rows, <span class="kw-2">&amp;</span>schema)
     }
 
@@ -876,12 +869,10 @@
 
     <span class="doccomment">/// Transpose a DataFrame. This is a very expensive operation.
     </span><span class="kw">pub fn </span>transpose(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PolarsResult&lt;DataFrame&gt; {
-        <span class="kw">let </span>height = <span class="self">self</span>.height();
-        <span class="kw">let </span>width = <span class="self">self</span>.width();
-        <span class="kw">if </span>height == <span class="number">0 </span>|| width == <span class="number">0 </span>{
-            <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::NoData(<span class="string">&quot;empty dataframe&quot;</span>.into()));
-        }
-
+        <span class="macro">polars_ensure!</span>(
+            <span class="self">self</span>.height() != <span class="number">0 </span>&amp;&amp; <span class="self">self</span>.width() != <span class="number">0</span>,
+            NoData: <span class="string">&quot;unable to transpose an empty dataframe&quot;
+        </span>);
         <span class="kw">let </span>dtype = <span class="self">self</span>.get_supertype().unwrap()<span class="question-mark">?</span>;
         <span class="self">self</span>.transpose_from_dtype(<span class="kw-2">&amp;</span>dtype)
     }
@@ -1000,10 +991,7 @@
 ) -&gt; PolarsResult&lt;Schema&gt; {
     <span class="comment">// no of rows to use to infer dtype
     </span><span class="kw">let </span>max_infer = infer_schema_length.unwrap_or(rows.len());
-
-    <span class="kw">if </span>rows.is_empty() {
-        <span class="kw">return </span>PolarsResult::Err(PolarsError::NoData(<span class="string">&quot;No rows. Cannot infer schema.&quot;</span>.into()));
-    }
+    <span class="macro">polars_ensure!</span>(!rows.is_empty(), NoData: <span class="string">&quot;no rows, cannot infer schema&quot;</span>);
     <span class="kw">let </span><span class="kw-2">mut </span>dtypes: Vec&lt;PlIndexSet&lt;DataType&gt;&gt; = <span class="macro">vec!</span>[PlIndexSet::new(); rows[<span class="number">0</span>].<span class="number">0</span>.len()];
 
     <span class="kw">for </span>row <span class="kw">in </span>rows.iter().take(max_infer) {
@@ -1177,8 +1165,10 @@
 
     <span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>add_fallible(<span class="kw-2">&amp;mut </span><span class="self">self</span>, val: <span class="kw-2">&amp;</span>AnyValue&lt;<span class="lifetime">&#39;a</span>&gt;) -&gt; PolarsResult&lt;()&gt; {
         <span class="self">self</span>.add(val.clone()).ok_or_else(|| {
-            PolarsError::ComputeError(<span class="macro">format!</span>(<span class="string">&quot;Could not append {val:?} to builder; make sure that all rows have the same schema.\n\
-            Or consider increasing the the &#39;schema_inference_length&#39; argument.&quot;</span>).into())
+            <span class="macro">polars_err!</span>(
+                ComputeError: <span class="string">&quot;could not append {:?} to the builder; make sure that all rows \
+                have the same schema or consider increasing `schema_inference_length`&quot;
+            </span>)
         })
     }
 

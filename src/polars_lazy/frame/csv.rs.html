@@ -308,6 +308,9 @@
 <a href="#308" id="308">308</a>
 <a href="#309" id="309">309</a>
 <a href="#310" id="310">310</a>
+<a href="#311" id="311">311</a>
+<a href="#312" id="312">312</a>
+<a href="#313" id="313">313</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::path::{Path, PathBuf};
 
 <span class="kw">use </span>polars_core::prelude::<span class="kw-2">*</span>;
@@ -515,19 +518,11 @@
     <span class="kw">where
         </span>F: Fn(Schema) -&gt; PolarsResult&lt;Schema&gt;,
     {
-        <span class="kw">let </span>path;
-
         <span class="kw">let </span><span class="kw-2">mut </span>file = <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">mut </span>paths) = <span class="self">self</span>.glob()<span class="question-mark">? </span>{
-            <span class="kw">match </span>paths.next() {
-                <span class="prelude-val">Some</span>(globresult) =&gt; {
-                    path = globresult<span class="question-mark">?</span>;
-                }
-                <span class="prelude-val">None </span>=&gt; {
-                    <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                        <span class="string">&quot;globbing pattern did not match any files&quot;</span>.into(),
-                    ));
-                }
-            }
+            <span class="kw">let </span>path = <span class="kw">match </span>paths.next() {
+                <span class="prelude-val">Some</span>(globresult) =&gt; globresult<span class="question-mark">?</span>,
+                <span class="prelude-val">None </span>=&gt; <span class="macro">polars_bail!</span>(ComputeError: <span class="string">&quot;globbing pattern did not match any files&quot;</span>),
+            };
             std::fs::File::open(<span class="kw-2">&amp;</span>path)
         } <span class="kw">else </span>{
             std::fs::File::open(<span class="kw-2">&amp;</span><span class="self">self</span>.path)
@@ -612,6 +607,17 @@
         <span class="self">self</span>.rechunk = toggle;
         <span class="self">self
     </span>}
+
+    <span class="doccomment">/// Try to stop parsing when `n` rows are parsed. During multithreaded parsing the upper bound `n` cannot
+    /// be guaranteed.
+    </span><span class="kw">fn </span>n_rows(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;usize&gt; {
+        <span class="self">self</span>.n_rows
+    }
+
+    <span class="doccomment">/// Add a `row_count` column.
+    </span><span class="kw">fn </span>row_count(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>RowCount&gt; {
+        <span class="self">self</span>.row_count.as_ref()
+    }
 
     <span class="kw">fn </span>concat_impl(<span class="kw-2">&amp;</span><span class="self">self</span>, lfs: Vec&lt;LazyFrame&gt;) -&gt; PolarsResult&lt;LazyFrame&gt; {
         <span class="comment">// set to false, as the csv parser has full thread utilization

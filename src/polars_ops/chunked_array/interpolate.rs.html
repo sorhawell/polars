@@ -338,8 +338,6 @@
 <a href="#338" id="338">338</a>
 <a href="#339" id="339">339</a>
 <a href="#340" id="340">340</a>
-<a href="#341" id="341">341</a>
-<a href="#342" id="342">342</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::ops::{Add, Div, Mul, Sub};
 
 <span class="kw">use </span>arrow::array::PrimitiveArray;
@@ -511,8 +509,7 @@
     <span class="kw">match </span>s.dtype() {
         <span class="attr">#[cfg(feature = <span class="string">&quot;dtype-categorical&quot;</span>)]
         </span>DataType::Categorical(<span class="kw">_</span>) =&gt; s.clone(),
-        <span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-        </span>DataType::Binary =&gt; s.clone(),
+        DataType::Binary =&gt; s.clone(),
         <span class="attr">#[cfg(feature = <span class="string">&quot;dtype-struct&quot;</span>)]
         </span>DataType::Struct(<span class="kw">_</span>) =&gt; s.clone(),
         DataType::List(<span class="kw">_</span>) =&gt; s.clone(),
@@ -535,8 +532,7 @@
     <span class="kw">match </span>s.dtype() {
         <span class="attr">#[cfg(feature = <span class="string">&quot;dtype-categorical&quot;</span>)]
         </span>DataType::Categorical(<span class="kw">_</span>) =&gt; s.clone(),
-        <span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-        </span>DataType::Binary =&gt; s.clone(),
+        DataType::Binary =&gt; s.clone(),
         <span class="attr">#[cfg(feature = <span class="string">&quot;dtype-struct&quot;</span>)]
         </span>DataType::Struct(<span class="kw">_</span>) =&gt; s.clone(),
         DataType::List(<span class="kw">_</span>) =&gt; s.clone(),

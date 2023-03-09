@@ -416,32 +416,6 @@
 <a href="#416" id="416">416</a>
 <a href="#417" id="417">417</a>
 <a href="#418" id="418">418</a>
-<a href="#419" id="419">419</a>
-<a href="#420" id="420">420</a>
-<a href="#421" id="421">421</a>
-<a href="#422" id="422">422</a>
-<a href="#423" id="423">423</a>
-<a href="#424" id="424">424</a>
-<a href="#425" id="425">425</a>
-<a href="#426" id="426">426</a>
-<a href="#427" id="427">427</a>
-<a href="#428" id="428">428</a>
-<a href="#429" id="429">429</a>
-<a href="#430" id="430">430</a>
-<a href="#431" id="431">431</a>
-<a href="#432" id="432">432</a>
-<a href="#433" id="433">433</a>
-<a href="#434" id="434">434</a>
-<a href="#435" id="435">435</a>
-<a href="#436" id="436">436</a>
-<a href="#437" id="437">437</a>
-<a href="#438" id="438">438</a>
-<a href="#439" id="439">439</a>
-<a href="#440" id="440">440</a>
-<a href="#441" id="441">441</a>
-<a href="#442" id="442">442</a>
-<a href="#443" id="443">443</a>
-<a href="#444" id="444">444</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::hash::Hash;
 
 <span class="kw">use </span>hashbrown::hash_set::HashSet;
@@ -549,13 +523,7 @@
                     DataType::UInt16 | DataType::Int16 =&gt; <span class="kw">unsafe </span>{
                         is_in_helper::&lt;T, u16&gt;(<span class="self">self</span>, other)
                     },
-                    <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                        <span class="macro">format!</span>(
-                            <span class="string">&quot;Data type {:?} not supported in is_in operation&quot;</span>,
-                            <span class="self">self</span>.dtype()
-                        )
-                        .into(),
-                    )),
+                    dt =&gt; <span class="macro">polars_bail!</span>(opq = is_in, dt),
                 }
             }
         }
@@ -658,14 +626,7 @@
                 ca.rename(<span class="self">self</span>.name());
                 <span class="prelude-val">Ok</span>(ca)
             }
-            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(PolarsError::SchemaMisMatch(
-                <span class="macro">format!</span>(
-                    <span class="string">&quot;cannot do is_in operation with left a dtype: {:?} and right a dtype {:?}&quot;</span>,
-                    <span class="self">self</span>.dtype(),
-                    other.dtype()
-                )
-                .into(),
-            )),
+            <span class="kw">_ </span>=&gt; <span class="macro">polars_bail!</span>(opq = is_in, <span class="self">self</span>.dtype(), other.dtype()),
         }
         .map(|<span class="kw-2">mut </span>ca| {
             ca.rename(<span class="self">self</span>.name());
@@ -674,8 +635,7 @@
     }
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-</span><span class="kw">impl </span>IsIn <span class="kw">for </span>BinaryChunked {
+<span class="kw">impl </span>IsIn <span class="kw">for </span>BinaryChunked {
     <span class="kw">fn </span>is_in(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Series) -&gt; PolarsResult&lt;BooleanChunked&gt; {
         <span class="kw">match </span>other.dtype() {
             DataType::List(dt) <span class="kw">if </span>DataType::Binary == <span class="kw-2">**</span>dt =&gt; {
@@ -722,14 +682,7 @@
                 ca.rename(<span class="self">self</span>.name());
                 <span class="prelude-val">Ok</span>(ca)
             }
-            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(PolarsError::SchemaMisMatch(
-                <span class="macro">format!</span>(
-                    <span class="string">&quot;cannot do is_in operation with left a dtype: {:?} and right a dtype {:?}&quot;</span>,
-                    <span class="self">self</span>.dtype(),
-                    other.dtype()
-                )
-                .into(),
-            )),
+            <span class="kw">_ </span>=&gt; <span class="macro">polars_bail!</span>(opq = is_in, <span class="self">self</span>.dtype(), other.dtype()),
         }
         .map(|<span class="kw-2">mut </span>ca| {
             ca.rename(<span class="self">self</span>.name());
@@ -779,14 +732,7 @@
                 <span class="kw">let </span>has_false = !other.all();
                 <span class="prelude-val">Ok</span>(<span class="self">self</span>.apply(|v| <span class="kw">if </span>v { has_true } <span class="kw">else </span>{ has_false }))
             }
-            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(PolarsError::SchemaMisMatch(
-                <span class="macro">format!</span>(
-                    <span class="string">&quot;cannot do is_in operation with left a dtype: {:?} and right a dtype {:?}&quot;</span>,
-                    <span class="self">self</span>.dtype(),
-                    other.dtype()
-                )
-                .into(),
-            )),
+            <span class="kw">_ </span>=&gt; <span class="macro">polars_bail!</span>(opq = is_in, <span class="self">self</span>.dtype(), other.dtype()),
         }
         .map(|<span class="kw-2">mut </span>ca| {
             ca.rename(<span class="self">self</span>.name());
@@ -835,9 +781,11 @@
             <span class="kw">_ </span>=&gt; {
                 <span class="kw">let </span>other = other.struct_()<span class="question-mark">?</span>;
 
-                <span class="kw">if </span><span class="self">self</span>.fields().len() != other.fields().len() {
-                    <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(<span class="macro">format!</span>(<span class="string">&quot;Cannot compare structs in &#39;is_in&#39;, the number of fields differ. Fields left: {}, fields right: {}&quot;</span>, <span class="self">self</span>.fields().len(), other.fields().len()).into()));
-                }
+                <span class="macro">polars_ensure!</span>(
+                    <span class="self">self</span>.fields().len() == other.fields().len(),
+                    ComputeError: <span class="string">&quot;`is_in`: mismatch in the number of struct fields: {} and {}&quot;</span>,
+                    <span class="self">self</span>.fields().len(), other.fields().len()
+                );
 
                 <span class="kw">let </span>out = <span class="self">self
                     </span>.fields()
@@ -854,7 +802,7 @@
                         acc &amp; val
                     }
                 });
-                out.ok_or_else(|| PolarsError::ComputeError(<span class="string">&quot;no fields in struct&quot;</span>.into()))
+                out.ok_or_else(|| <span class="macro">polars_err!</span>(ComputeError: <span class="string">&quot;no fields in struct&quot;</span>))
             }
         }
     }

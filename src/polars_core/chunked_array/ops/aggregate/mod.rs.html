@@ -1042,7 +1042,6 @@
 <a href="#1042" id="1042">1042</a>
 <a href="#1043" id="1043">1043</a>
 <a href="#1044" id="1044">1044</a>
-<a href="#1045" id="1045">1045</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Implementations of the ChunkAgg trait.
 </span><span class="kw">mod </span>quantile;
 <span class="kw">mod </span>var;
@@ -1053,7 +1052,7 @@
 <span class="kw">use </span>arrow::compute;
 <span class="kw">use </span>arrow::types::simd::Simd;
 <span class="kw">use </span>arrow::types::NativeType;
-<span class="kw">use </span>num::{Float, ToPrimitive};
+<span class="kw">use </span>num_traits::{Float, ToPrimitive};
 <span class="kw">use </span>polars_arrow::kernels::rolling::{compare_fn_nan_max, compare_fn_nan_min};
 <span class="kw">pub use </span>quantile::<span class="kw-2">*</span>;
 <span class="kw">pub use </span>var::<span class="kw-2">*</span>;
@@ -1504,8 +1503,7 @@
     }
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-</span><span class="kw">impl </span>ChunkAggSeries <span class="kw">for </span>BinaryChunked {
+<span class="kw">impl </span>ChunkAggSeries <span class="kw">for </span>BinaryChunked {
     <span class="kw">fn </span>sum_as_series(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Series {
         BinaryChunked::full_null(<span class="self">self</span>.name(), <span class="number">1</span>).into_series()
     }

@@ -140,6 +140,17 @@
 <a href="#140" id="140">140</a>
 <a href="#141" id="141">141</a>
 <a href="#142" id="142">142</a>
+<a href="#143" id="143">143</a>
+<a href="#144" id="144">144</a>
+<a href="#145" id="145">145</a>
+<a href="#146" id="146">146</a>
+<a href="#147" id="147">147</a>
+<a href="#148" id="148">148</a>
+<a href="#149" id="149">149</a>
+<a href="#150" id="150">150</a>
+<a href="#151" id="151">151</a>
+<a href="#152" id="152">152</a>
+<a href="#153" id="153">153</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::path::{Path, PathBuf};
 
 <span class="kw">use </span>dirs::home_dir;
@@ -193,13 +204,6 @@
 ) -&gt; PolarsResult&lt;Vec&lt;usize&gt;&gt; {
     <span class="kw">use </span>ahash::AHashMap;
 
-    <span class="kw">let </span>err = |column: <span class="kw-2">&amp;</span>str| {
-        <span class="kw">let </span>valid_columns: Vec&lt;String&gt; = schema.fields.iter().map(|f| f.name.clone()).collect();
-        PolarsError::ColumnNotFound(
-            <span class="macro">format!</span>(<span class="string">&quot;Unable to find \&quot;{column}\&quot;. Valid columns: {valid_columns:?}&quot;</span>,).into(),
-        )
-    };
-
     <span class="kw">let </span><span class="kw-2">mut </span>prj = Vec::with_capacity(columns.len());
     <span class="kw">if </span>columns.len() &gt; <span class="number">100 </span>{
         <span class="kw">let </span><span class="kw-2">mut </span>column_names = AHashMap::with_capacity(schema.fields.len());
@@ -208,11 +212,14 @@
         });
 
         <span class="kw">for </span>column <span class="kw">in </span>columns.iter() {
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>i) = column_names.get(column.as_str()) {
-                prj.push(i)
-            } <span class="kw">else </span>{
-                <span class="kw">return </span><span class="prelude-val">Err</span>(err(column));
-            }
+            <span class="kw">let </span><span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span>i) = column_names.get(column.as_str()) <span class="kw">else </span>{
+                <span class="kw">let </span>valid_columns: Vec&lt;String&gt; = schema.fields.iter().map(|f| f.name.clone()).collect();
+                <span class="macro">polars_bail!</span>(
+                    ColumnNotFound:
+                    <span class="string">&quot;unable to find {:?}; valid columns: {:?}&quot;</span>, column, valid_columns,
+                );
+            };
+            prj.push(i);
         }
     } <span class="kw">else </span>{
         <span class="kw">for </span>column <span class="kw">in </span>columns.iter() {
@@ -234,6 +241,21 @@
                 <span class="kw-2">*</span>s = <span class="kw-2">&amp;*</span>s + previous;
             }
             previous += <span class="kw-2">*</span>n_read;
+        }
+    }
+}
+
+<span class="doccomment">/// Because of threading every row starts from `0` or from `offset`.
+/// We must correct that so that they are monotonically increasing.
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>update_row_counts2(dfs: <span class="kw-2">&amp;mut </span>[DataFrame], offset: IdxSize) {
+    <span class="kw">if </span>!dfs.is_empty() {
+        <span class="kw">let </span><span class="kw-2">mut </span>previous = dfs[<span class="number">0</span>].height() <span class="kw">as </span>IdxSize + offset;
+        <span class="kw">for </span>df <span class="kw">in </span><span class="kw-2">&amp;mut </span>dfs[<span class="number">1</span>..] {
+            <span class="kw">let </span>n_read = df.height() <span class="kw">as </span>IdxSize;
+            <span class="kw">if let </span><span class="prelude-val">Some</span>(s) = df.get_columns_mut().get_mut(<span class="number">0</span>) {
+                <span class="kw-2">*</span>s = <span class="kw-2">&amp;*</span>s + previous;
+            }
+            previous += n_read;
         }
     }
 }

@@ -575,13 +575,8 @@
 <a href="#575" id="575">575</a>
 <a href="#576" id="576">576</a>
 <a href="#577" id="577">577</a>
-<a href="#578" id="578">578</a>
-<a href="#579" id="579">579</a>
-<a href="#580" id="580">580</a>
-<a href="#581" id="581">581</a>
-<a href="#582" id="582">582</a>
 </pre><pre class="rust"><code><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>multiple_keys;
-<span class="kw">mod </span>single_keys;
+<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">mod </span>single_keys;
 <span class="kw">mod </span>single_keys_dispatch;
 <span class="kw">mod </span>single_keys_inner;
 <span class="kw">mod </span>single_keys_left;
@@ -604,10 +599,8 @@
 </span><span class="kw">use </span>serde::{Deserialize, Serialize};
 <span class="attr">#[cfg(feature = <span class="string">&quot;asof_join&quot;</span>)]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>single_keys::create_probe_table;
-<span class="kw">use </span>single_keys::<span class="kw-2">*</span>;
 <span class="attr">#[cfg(feature = <span class="string">&quot;asof_join&quot;</span>)]
-</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>single_keys_dispatch::prepare_strs;
-<span class="kw">use </span>single_keys_inner::<span class="kw-2">*</span>;
+</span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">use </span>single_keys_dispatch::prepare_bytes;
 <span class="kw">use </span>single_keys_left::<span class="kw-2">*</span>;
 <span class="kw">use </span>single_keys_outer::<span class="kw-2">*</span>;
 <span class="attr">#[cfg(feature = <span class="string">&quot;semi_anti_join&quot;</span>)]
@@ -688,16 +681,14 @@
 /// a different global string cache the mapping will be incorrect.
 </span><span class="attr">#[cfg(feature = <span class="string">&quot;dtype-categorical&quot;</span>)]
 </span><span class="kw">pub fn </span>_check_categorical_src(l: <span class="kw-2">&amp;</span>DataType, r: <span class="kw-2">&amp;</span>DataType) -&gt; PolarsResult&lt;()&gt; {
-    <span class="kw">match </span>(l, r) {
-        (DataType::Categorical(<span class="prelude-val">Some</span>(l)), DataType::Categorical(<span class="prelude-val">Some</span>(r))) =&gt; {
-            <span class="kw">if </span>!l.same_src(r) {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(<span class="string">&quot;Joins/or comparisons on categorical dtypes can only happen if they are created under the same global string cache.\
-                  Hint: set a global StringCache&quot;</span>.into()));
-            }
-            <span class="prelude-val">Ok</span>(())
-        }
-        <span class="kw">_ </span>=&gt; <span class="prelude-val">Ok</span>(()),
+    <span class="kw">if let </span>(DataType::Categorical(<span class="prelude-val">Some</span>(l)), DataType::Categorical(<span class="prelude-val">Some</span>(r))) = (l, r) {
+        <span class="macro">polars_ensure!</span>(
+            l.same_src(r),
+            ComputeError: <span class="string">&quot;joins/or comparisons on categoricals can only happen if they were \
+            created under the same global string cache&quot;
+        </span>);
     }
+    <span class="prelude-val">Ok</span>(())
 }
 
 <span class="attr">#[derive(Clone, PartialEq, Eq)]
@@ -842,8 +833,7 @@
 }
 <span class="macro">impl_zip_outer_join!</span>(BooleanChunked);
 <span class="macro">impl_zip_outer_join!</span>(Utf8Chunked);
-<span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-</span><span class="macro">impl_zip_outer_join!</span>(BinaryChunked);
+<span class="macro">impl_zip_outer_join!</span>(BinaryChunked);
 
 <span class="kw">impl </span>ZipOuterJoinColumn <span class="kw">for </span>Float32Chunked {
     <span class="kw">fn </span>zip_outer_join_column(

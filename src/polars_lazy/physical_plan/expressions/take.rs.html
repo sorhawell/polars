@@ -209,8 +209,6 @@
 <a href="#209" id="209">209</a>
 <a href="#210" id="210">210</a>
 <a href="#211" id="211">211</a>
-<a href="#212" id="212">212</a>
-<a href="#213" id="213">213</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span>polars_arrow::utils::CustomIterTools;
@@ -218,7 +216,6 @@
 <span class="kw">use </span>polars_core::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>polars_core::utils::NoNull;
 
-<span class="kw">use </span><span class="kw">crate</span>::physical_plan::expression_err;
 <span class="kw">use </span><span class="kw">crate</span>::physical_plan::state::ExecutionState;
 <span class="kw">use </span><span class="kw">crate</span>::prelude::<span class="kw-2">*</span>;
 
@@ -249,8 +246,7 @@
     }
 
     <span class="kw">fn </span>oob_err(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; PolarsResult&lt;()&gt; {
-        <span class="kw">let </span>msg = <span class="string">&quot;Out of bounds.&quot;</span>;
-        <span class="prelude-val">Err</span>(<span class="macro">expression_err!</span>(msg, <span class="self">self</span>.expr, ComputeError))
+        <span class="macro">polars_bail!</span>(expr = <span class="self">self</span>.expr, ComputeError: <span class="string">&quot;index out of bounds&quot;</span>);
     }
 }
 
@@ -342,7 +338,7 @@
 
                     <span class="kw">return if </span>idx.len() == <span class="number">1 </span>{
                         <span class="kw">match </span>idx.get(<span class="number">0</span>) {
-                            <span class="prelude-val">None </span>=&gt; <span class="prelude-val">Err</span>(PolarsError::ComputeError(<span class="string">&quot;cannot take by a null&quot;</span>.into())),
+                            <span class="prelude-val">None </span>=&gt; <span class="macro">polars_bail!</span>(ComputeError: <span class="string">&quot;cannot take by a null&quot;</span>),
                             <span class="prelude-val">Some</span>(idx) =&gt; {
                                 <span class="kw">if </span>idx != <span class="number">0 </span>{
                                     <span class="comment">// We must make sure that the column we take from is sorted by

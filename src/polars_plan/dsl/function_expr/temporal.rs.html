@@ -72,9 +72,9 @@
             ca.<span class="number">0</span>.apply_mut(|v| adder(<span class="kw-2">&amp;</span>offset, v));
             <span class="prelude-val">Ok</span>(ca.into_series())
         }
-        dt =&gt; <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-            <span class="macro">format!</span>(<span class="string">&quot;cannot use &#39;date_offset&#39; on Series of dtype: {dt:?}&quot;</span>).into(),
-        )),
+        dt =&gt; <span class="macro">polars_bail!</span>(
+            ComputeError: <span class="string">&quot;cannot use &#39;date_offset&#39; on Series of datatype {}&quot;</span>, dt,
+        ),
     }
 }
 

@@ -81,7 +81,15 @@
 <a href="#81" id="81">81</a>
 <a href="#82" id="82">82</a>
 <a href="#83" id="83">83</a>
-</pre><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href="#84" id="84">84</a>
+<a href="#85" id="85">85</a>
+<a href="#86" id="86">86</a>
+<a href="#87" id="87">87</a>
+</pre><pre class="rust"><code><span class="kw">use </span>std::path::PathBuf;
+
+<span class="kw">use </span>polars_io::predicates::PhysicalIoExpr;
+
+<span class="kw">use super</span>::<span class="kw-2">*</span>;
 
 <span class="kw">pub struct </span>CsvExec {
     <span class="kw">pub </span>path: PathBuf,
@@ -111,7 +119,7 @@
         CsvReader::from_path(<span class="kw-2">&amp;</span><span class="self">self</span>.path)
             .unwrap()
             .has_header(<span class="self">self</span>.options.has_header)
-            .with_schema(<span class="kw-2">&amp;</span><span class="self">self</span>.schema)
+            .with_dtypes(<span class="prelude-val">Some</span>(<span class="self">self</span>.schema.clone()))
             .with_delimiter(<span class="self">self</span>.options.delimiter)
             .with_ignore_errors(<span class="self">self</span>.options.ignore_errors)
             .with_skip_rows(<span class="self">self</span>.options.skip_rows)
@@ -144,11 +152,11 @@
         };
 
         <span class="kw">let </span>profile_name = <span class="kw">if </span>state.has_node_timer() {
-            <span class="kw">let </span><span class="kw-2">mut </span>ids = <span class="macro">vec!</span>[<span class="self">self</span>.path.to_string_lossy().to_string()];
+            <span class="kw">let </span><span class="kw-2">mut </span>ids = <span class="macro">vec!</span>[<span class="self">self</span>.path.to_string_lossy().into()];
             <span class="kw">if </span><span class="self">self</span>.predicate.is_some() {
-                ids.push(<span class="string">&quot;predicate&quot;</span>.to_string())
+                ids.push(<span class="string">&quot;predicate&quot;</span>.into())
             }
-            <span class="kw">let </span>name = column_delimited(<span class="string">&quot;csv&quot;</span>.to_string(), <span class="kw-2">&amp;</span>ids);
+            <span class="kw">let </span>name = comma_delimited(<span class="string">&quot;csv&quot;</span>.to_string(), <span class="kw-2">&amp;</span>ids);
             Cow::Owned(name)
         } <span class="kw">else </span>{
             Cow::Borrowed(<span class="string">&quot;&quot;</span>)

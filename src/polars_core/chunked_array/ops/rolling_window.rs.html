@@ -283,7 +283,8 @@
 
     <span class="kw">use </span>arrow::array::{Array, PrimitiveArray};
     <span class="kw">use </span>arrow::bitmap::MutableBitmap;
-    <span class="kw">use </span>num::{Float, Zero};
+    <span class="kw">use </span>num_traits::pow::Pow;
+    <span class="kw">use </span>num_traits::{Float, Zero};
     <span class="kw">use </span>polars_arrow::bit_util::unset_bit_raw;
     <span class="kw">use </span>polars_arrow::data_types::IsFloat;
     <span class="kw">use </span>polars_arrow::trusted_len::PushUnchecked;
@@ -292,13 +293,12 @@
 
     <span class="doccomment">/// utility
     </span><span class="kw">fn </span>check_input(window_size: usize, min_periods: usize) -&gt; PolarsResult&lt;()&gt; {
-        <span class="kw">if </span>min_periods &gt; window_size {
-            <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                <span class="string">&quot;`windows_size` should be &gt;= `min_periods`&quot;</span>.into(),
-            ))
-        } <span class="kw">else </span>{
-            <span class="prelude-val">Ok</span>(())
-        }
+        <span class="macro">polars_ensure!</span>(
+            min_periods &lt;= window_size,
+            ComputeError: <span class="string">&quot;`window_size`: {} should be &gt;= `min_periods`: {}&quot;</span>,
+            window_size, min_periods
+        );
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="doccomment">/// utility
@@ -307,7 +307,7 @@
             <span class="kw">let </span>right_window = (window_size + <span class="number">1</span>) / <span class="number">2</span>;
             (
                 idx.saturating_sub(window_size - right_window),
-                std::cmp::min(len, idx + right_window),
+                len.min(idx + right_window),
             )
         } <span class="kw">else </span>{
             (idx.saturating_sub(window_size - <span class="number">1</span>), idx + <span class="number">1</span>)
@@ -437,7 +437,7 @@
     <span class="kw">where
         </span>ChunkedArray&lt;T&gt;: IntoSeries,
         T: PolarsFloatType,
-        T::Native: Float + IsFloat + SubAssign + num::pow::Pow&lt;T::Native, Output = T::Native&gt;,
+        T::Native: Float + IsFloat + SubAssign + Pow&lt;T::Native, Output = T::Native&gt;,
     {
         <span class="doccomment">/// Apply a rolling custom function. This is pretty slow because of dynamic dispatch.
         </span><span class="kw">pub fn </span>rolling_apply_float&lt;F&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, window_size: usize, <span class="kw-2">mut </span>f: F) -&gt; PolarsResult&lt;<span class="self">Self</span>&gt;

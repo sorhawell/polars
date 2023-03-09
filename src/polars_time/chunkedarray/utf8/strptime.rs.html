@@ -268,10 +268,6 @@
 <a href="#268" id="268">268</a>
 <a href="#269" id="269">269</a>
 <a href="#270" id="270">270</a>
-<a href="#271" id="271">271</a>
-<a href="#272" id="272">272</a>
-<a href="#273" id="273">273</a>
-<a href="#274" id="274">274</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Much more opinionated, but also much faster strptrime than the one given in Chrono.
 //!
 </span><span class="kw">use </span>chrono::{NaiveDate, NaiveDateTime};
@@ -324,10 +320,17 @@
 </span><span class="comment">// # Safety
 // Caller must ensure that fmt adheres to the fmt rules of chrono and `fmt_len` is correct.
 </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">unsafe fn </span>parse(val: <span class="kw-2">&amp;</span>[u8], fmt: <span class="kw-2">&amp;</span>[u8], fmt_len: u16) -&gt; <span class="prelude-ty">Option</span>&lt;NaiveDateTime&gt; {
-    <span class="kw">const </span>ESCAPE: u8 = <span class="string">b&#39;%&#39;</span>;
-    <span class="kw">if </span>val.len() &lt; fmt_len <span class="kw">as </span>usize {
+    <span class="kw">let </span><span class="kw-2">mut </span>offset = <span class="number">0</span>;
+    <span class="kw">let </span><span class="kw-2">mut </span>negative = <span class="bool-val">false</span>;
+    <span class="kw">if </span>val.starts_with(<span class="string">b&quot;-&quot;</span>) &amp;&amp; fmt.starts_with(<span class="string">b&quot;%Y&quot;</span>) {
+        offset = <span class="number">1</span>;
+        negative = <span class="bool-val">true</span>;
+    }
+    <span class="kw">if </span>val.len() - offset != (fmt_len <span class="kw">as </span>usize) {
         <span class="kw">return </span><span class="prelude-val">None</span>;
     }
+
+    <span class="kw">const </span>ESCAPE: u8 = <span class="string">b&#39;%&#39;</span>;
     <span class="kw">let </span><span class="kw-2">mut </span>year: i32 = <span class="number">1</span>;
     <span class="comment">// minimal day/month is always 1
     // otherwise chrono may panic.
@@ -339,14 +342,6 @@
     <span class="kw">let </span><span class="kw-2">mut </span>nano: u32 = <span class="number">0</span>;
 
     <span class="kw">let </span><span class="kw-2">mut </span>fmt_iter = fmt.iter();
-
-    <span class="kw">let </span><span class="kw-2">mut </span>offset = <span class="number">0</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>negative = <span class="bool-val">false</span>;
-
-    <span class="kw">if </span>val.starts_with(<span class="string">b&quot;-&quot;</span>) &amp;&amp; fmt.starts_with(<span class="string">b&quot;%Y&quot;</span>) {
-        offset = <span class="number">1</span>;
-        negative = <span class="bool-val">true</span>;
-    }
 
     <span class="kw">while let </span><span class="prelude-val">Some</span>(fmt_b) = fmt_iter.next() {
         <span class="macro">debug_assert!</span>(offset &lt; val.len());
@@ -401,8 +396,6 @@
                     nano <span class="kw-2">*</span>= <span class="number">1_000_000</span>;
                     <span class="kw">break</span>;
                 }
-                <span class="comment">// utc can be ignored
-                </span><span class="string">b&#39;Z&#39; </span>=&gt; {}
                 <span class="kw">_ </span>=&gt; <span class="kw">return </span><span class="prelude-val">None</span>,
             }
         }
@@ -439,7 +432,6 @@
                 <span class="string">b&#39;H&#39; </span>=&gt; cnt += <span class="number">2</span>,
                 <span class="string">b&#39;M&#39; </span>=&gt; cnt += <span class="number">2</span>,
                 <span class="string">b&#39;S&#39; </span>=&gt; cnt += <span class="number">2</span>,
-                <span class="string">b&#39;Z&#39; </span>=&gt; cnt += <span class="number">1</span>,
                 <span class="string">b&#39;9&#39; </span>=&gt; {
                     cnt += <span class="number">9</span>;
                     <span class="macro">debug_assert_eq!</span>(iter.next(), <span class="prelude-val">Some</span>(<span class="kw-2">&amp;</span><span class="string">b&#39;f&#39;</span>));

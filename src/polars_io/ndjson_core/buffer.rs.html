@@ -208,12 +208,10 @@
 <a href="#208" id="208">208</a>
 <a href="#209" id="209">209</a>
 <a href="#210" id="210">210</a>
-<a href="#211" id="211">211</a>
-<a href="#212" id="212">212</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::hash::{Hash, Hasher};
 
 <span class="kw">use </span>arrow::types::NativeType;
-<span class="kw">use </span>num::traits::NumCast;
+<span class="kw">use </span>num_traits::NumCast;
 <span class="kw">use </span>polars_core::frame::row::AnyValueBuffer;
 <span class="kw">use </span>polars_core::prelude::<span class="kw-2">*</span>;
 <span class="attr">#[cfg(any(feature = <span class="string">&quot;dtype-datetime&quot;</span>, feature = <span class="string">&quot;dtype-date&quot;</span>))]
@@ -340,7 +338,7 @@
         .iter()
         .map(|(name, dtype)| {
             <span class="kw">let </span>av_buf = (dtype, capacity).into();
-            <span class="kw">let </span>key = KnownKey::from(name);
+            <span class="kw">let </span>key = KnownKey::from(name.as_str());
             <span class="prelude-val">Ok</span>((BufferKey(key), Buffer(name, av_buf)))
         })
         .collect()
@@ -348,10 +346,10 @@
 
 <span class="kw">fn </span>deserialize_number&lt;T: NativeType + NumCast&gt;(value: <span class="kw-2">&amp;</span>Value) -&gt; <span class="prelude-ty">Option</span>&lt;T&gt; {
     <span class="kw">match </span>value {
-        Value::Static(StaticNode::F64(f)) =&gt; num::traits::cast::&lt;f64, T&gt;(<span class="kw-2">*</span>f),
-        Value::Static(StaticNode::I64(i)) =&gt; num::traits::cast::&lt;i64, T&gt;(<span class="kw-2">*</span>i),
-        Value::Static(StaticNode::U64(u)) =&gt; num::traits::cast::&lt;u64, T&gt;(<span class="kw-2">*</span>u),
-        Value::Static(StaticNode::Bool(b)) =&gt; num::traits::cast::&lt;i32, T&gt;(<span class="kw-2">*</span>b <span class="kw">as </span>i32),
+        Value::Static(StaticNode::F64(f)) =&gt; num_traits::cast(<span class="kw-2">*</span>f),
+        Value::Static(StaticNode::I64(i)) =&gt; num_traits::cast(<span class="kw-2">*</span>i),
+        Value::Static(StaticNode::U64(u)) =&gt; num_traits::cast(<span class="kw-2">*</span>u),
+        Value::Static(StaticNode::Bool(b)) =&gt; num_traits::cast(<span class="kw-2">*</span>b <span class="kw">as </span>i32),
         <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
     }
 }
@@ -383,11 +381,9 @@
         Value::Static(StaticNode::Null) =&gt; AnyValue::Null,
         Value::String(s) =&gt; AnyValue::Utf8Owned(s.as_ref().into()),
         Value::Array(arr) =&gt; {
-            <span class="kw">let </span>inner_dtype = dtype.inner_dtype().ok_or_else(|| {
-                PolarsError::ComputeError(
-                    <span class="macro">format!</span>(<span class="string">&quot;Expected List/Array in json value got: {dtype}&quot;</span>).into(),
-                )
-            })<span class="question-mark">?</span>;
+            <span class="kw">let </span><span class="prelude-val">Some</span>(inner_dtype) = dtype.inner_dtype() <span class="kw">else </span>{
+                <span class="macro">polars_bail!</span>(ComputeError: <span class="string">&quot;expected list/array in json value, got {}&quot;</span>, dtype);
+            };
             <span class="kw">let </span>vals: Vec&lt;AnyValue&gt; = arr
                 .iter()
                 .map(|val| deserialize_all(val, inner_dtype))
@@ -412,9 +408,9 @@
                     .collect::&lt;PolarsResult&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;&gt;()<span class="question-mark">?</span>;
                 AnyValue::StructOwned(Box::new((vals, fields.clone())))
             } <span class="kw">else </span>{
-                <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                    <span class="macro">format!</span>(<span class="string">&quot;Expected: {dtype} but got object instead.&quot;</span>).into(),
-                ));
+                <span class="macro">polars_bail!</span>(
+                    ComputeError: <span class="string">&quot;expected {dtype} in json value, got object&quot;</span>,
+                );
             }
         }
         <span class="attr">#[cfg(not(feature = <span class="string">&quot;dtype-struct&quot;</span>))]

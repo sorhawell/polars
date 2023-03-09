@@ -388,9 +388,21 @@
 <a href="#388" id="388">388</a>
 <a href="#389" id="389">389</a>
 <a href="#390" id="390">390</a>
+<a href="#391" id="391">391</a>
+<a href="#392" id="392">392</a>
+<a href="#393" id="393">393</a>
+<a href="#394" id="394">394</a>
+<a href="#395" id="395">395</a>
+<a href="#396" id="396">396</a>
+<a href="#397" id="397">397</a>
+<a href="#398" id="398">398</a>
+<a href="#399" id="399">399</a>
+<a href="#400" id="400">400</a>
+<a href="#401" id="401">401</a>
 </pre><pre class="rust"><code><span class="kw">use </span>polars_arrow::array::ValueSize;
 <span class="attr">#[cfg(feature = <span class="string">&quot;dtype-struct&quot;</span>)]
 </span><span class="kw">use </span>polars_arrow::export::arrow::array::{MutableArray, MutableUtf8Array};
+<span class="kw">use </span>polars_utils::format_smartstring;
 
 <span class="kw">use </span><span class="kw">super</span>::function_expr::StringFunction;
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
@@ -411,7 +423,8 @@
         )
     }
 
-    <span class="doccomment">/// Check if a string value contains a Regex substring.
+    <span class="doccomment">/// Check if this column of strings contains a Regex. If `strict` is `true`, then it is an error if any `pat` is
+    /// an invalid regex, whereas if `strict` is `false`, an invalid regex will simply evaluate to `false`.
     </span><span class="attr">#[cfg(feature = <span class="string">&quot;regex&quot;</span>)]
     </span><span class="kw">pub fn </span>contains(<span class="self">self</span>, pat: Expr, strict: bool) -&gt; Expr {
         <span class="self">self</span>.<span class="number">0</span>.map_many_private(
@@ -442,7 +455,7 @@
         )
     }
 
-    <span class="doccomment">/// Extract a regex pattern from the a string value.
+    <span class="doccomment">/// Extract a regex pattern from the a string value. If `group_index` is out of bounds, null is returned.
     </span><span class="kw">pub fn </span>extract(<span class="self">self</span>, pat: <span class="kw-2">&amp;</span>str, group_index: usize) -&gt; Expr {
         <span class="kw">let </span>pat = pat.to_string();
         <span class="self">self</span>.<span class="number">0
@@ -488,7 +501,8 @@
         <span class="self">self</span>.<span class="number">0</span>.map_private(StringFunction::CountMatch(pat).into())
     }
 
-    <span class="attr">#[cfg(feature = <span class="string">&quot;temporal&quot;</span>)]
+    <span class="doccomment">/// Construct a `Datetime` column by parsing this string column as datetimes, using the provided `options`.
+    </span><span class="attr">#[cfg(feature = <span class="string">&quot;temporal&quot;</span>)]
     </span><span class="kw">pub fn </span>strptime(<span class="self">self</span>, options: StrpTimeOptions) -&gt; Expr {
         <span class="self">self</span>.<span class="number">0</span>.map_private(StringFunction::Strptime(options).into())
     }
@@ -607,7 +621,9 @@
                 function,
                 GetOutput::from_type(DataType::Struct(
                     (<span class="number">0</span>..n + <span class="number">1</span>)
-                        .map(|i| Field::from_owned(<span class="macro">format!</span>(<span class="string">&quot;field_{i}&quot;</span>), DataType::Utf8))
+                        .map(|i| {
+                            Field::from_owned(<span class="macro">format_smartstring!</span>(<span class="string">&quot;field_{i}&quot;</span>), DataType::Utf8)
+                        })
                         .collect(),
                 )),
             )
@@ -659,7 +675,9 @@
                 function,
                 GetOutput::from_type(DataType::Struct(
                     (<span class="number">0</span>..n + <span class="number">1</span>)
-                        .map(|i| Field::from_owned(<span class="macro">format!</span>(<span class="string">&quot;field_{i}&quot;</span>), DataType::Utf8))
+                        .map(|i| {
+                            Field::from_owned(<span class="macro">format_smartstring!</span>(<span class="string">&quot;field_{i}&quot;</span>), DataType::Utf8)
+                        })
                         .collect(),
                 )),
             )
@@ -711,7 +729,9 @@
                 function,
                 GetOutput::from_type(DataType::Struct(
                     (<span class="number">0</span>..n)
-                        .map(|i| Field::from_owned(<span class="macro">format!</span>(<span class="string">&quot;field_{i}&quot;</span>), DataType::Utf8))
+                        .map(|i| {
+                            Field::from_owned(<span class="macro">format_smartstring!</span>(<span class="string">&quot;field_{i}&quot;</span>), DataType::Utf8)
+                        })
                         .collect(),
                 )),
             )
@@ -773,9 +793,11 @@
 
     <span class="attr">#[cfg(feature = <span class="string">&quot;string_from_radix&quot;</span>)]
     </span><span class="doccomment">/// Parse string in base radix into decimal
-    </span><span class="kw">pub fn </span>from_radix(<span class="self">self</span>, radix: <span class="prelude-ty">Option</span>&lt;u32&gt;) -&gt; Expr {
+    </span><span class="kw">pub fn </span>from_radix(<span class="self">self</span>, radix: u32, strict: bool) -&gt; Expr {
         <span class="self">self</span>.<span class="number">0
-            </span>.map_private(FunctionExpr::StringExpr(StringFunction::FromRadix(radix)))
+            </span>.map_private(FunctionExpr::StringExpr(StringFunction::FromRadix(
+                radix, strict,
+            )))
     }
 }
 </code></pre></div>

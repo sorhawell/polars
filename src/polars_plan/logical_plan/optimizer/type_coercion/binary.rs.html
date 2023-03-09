@@ -291,6 +291,23 @@
 <a href="#291" id="291">291</a>
 <a href="#292" id="292">292</a>
 <a href="#293" id="293">293</a>
+<a href="#294" id="294">294</a>
+<a href="#295" id="295">295</a>
+<a href="#296" id="296">296</a>
+<a href="#297" id="297">297</a>
+<a href="#298" id="298">298</a>
+<a href="#299" id="299">299</a>
+<a href="#300" id="300">300</a>
+<a href="#301" id="301">301</a>
+<a href="#302" id="302">302</a>
+<a href="#303" id="303">303</a>
+<a href="#304" id="304">304</a>
+<a href="#305" id="305">305</a>
+<a href="#306" id="306">306</a>
+<a href="#307" id="307">307</a>
+<a href="#308" id="308">308</a>
+<a href="#309" id="309">309</a>
+<a href="#310" id="310">310</a>
 </pre><pre class="rust"><code><span class="kw">use </span>polars_utils::matches_any_order;
 
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
@@ -367,15 +384,13 @@
 }
 
 <span class="kw">fn </span>str_numeric_arithmetic(type_left: <span class="kw-2">&amp;</span>DataType, type_right: <span class="kw-2">&amp;</span>DataType) -&gt; PolarsResult&lt;()&gt; {
-    <span class="kw">if </span>type_left.is_numeric() &amp;&amp; <span class="macro">matches!</span>(type_right, DataType::Utf8)
-        || type_right.is_numeric() &amp;&amp; <span class="macro">matches!</span>(type_left, DataType::Utf8)
-    {
-        <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-            <span class="string">&quot;Arithmetic on string and numeric not allowed. Try an explicit cast first.&quot;</span>.into(),
-        ))
-    } <span class="kw">else </span>{
-        <span class="prelude-val">Ok</span>(())
-    }
+    <span class="kw">let </span>mismatch = type_left.is_numeric() &amp;&amp; <span class="macro">matches!</span>(type_right, DataType::Utf8)
+        || type_right.is_numeric() &amp;&amp; <span class="macro">matches!</span>(type_left, DataType::Utf8);
+    <span class="macro">polars_ensure!</span>(
+        !mismatch,
+        ComputeError: <span class="string">&quot;arithmetic on string and numeric not allowed, try an explicit cast first&quot;</span>,
+    );
+    <span class="prelude-val">Ok</span>(())
 }
 
 <span class="kw">fn </span>process_list_arithmetic(
@@ -471,6 +486,25 @@
             }
         }
         <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(),
+    }
+}
+
+<span class="attr">#[cfg(any(
+    feature = <span class="string">&quot;dtype-date&quot;</span>,
+    feature = <span class="string">&quot;dtype-datetime&quot;</span>,
+    feature = <span class="string">&quot;dtype-time&quot;
+</span>))]
+</span><span class="kw">fn </span>err_date_str_compare() -&gt; PolarsResult&lt;()&gt; {
+    <span class="kw">if </span><span class="macro">cfg!</span>(feature = <span class="string">&quot;python&quot;</span>) {
+        <span class="macro">polars_bail!</span>(
+            ComputeError:
+            <span class="string">&quot;cannot compare &#39;date/datetime/time&#39; to a string value \
+            (create native python {{ &#39;date&#39;, &#39;datetime&#39;, &#39;time&#39; }} or compare to a temporal column)&quot;
+        </span>);
+    } <span class="kw">else </span>{
+        <span class="macro">polars_bail!</span>(
+            ComputeError: <span class="string">&quot;cannot compare &#39;date/datetime/time&#39; to a string value&quot;
+        </span>);
     }
 }
 

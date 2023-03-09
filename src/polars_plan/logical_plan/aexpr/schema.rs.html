@@ -254,7 +254,36 @@
 <a href="#254" id="254">254</a>
 <a href="#255" id="255">255</a>
 <a href="#256" id="256">256</a>
+<a href="#257" id="257">257</a>
+<a href="#258" id="258">258</a>
+<a href="#259" id="259">259</a>
+<a href="#260" id="260">260</a>
+<a href="#261" id="261">261</a>
+<a href="#262" id="262">262</a>
+<a href="#263" id="263">263</a>
+<a href="#264" id="264">264</a>
+<a href="#265" id="265">265</a>
+<a href="#266" id="266">266</a>
+<a href="#267" id="267">267</a>
+<a href="#268" id="268">268</a>
+<a href="#269" id="269">269</a>
+<a href="#270" id="270">270</a>
+<a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
+<a href="#274" id="274">274</a>
+<a href="#275" id="275">275</a>
+<a href="#276" id="276">276</a>
+<a href="#277" id="277">277</a>
+<a href="#278" id="278">278</a>
+<a href="#279" id="279">279</a>
 </pre><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
+
+<span class="kw">fn </span>float_type(field: <span class="kw-2">&amp;mut </span>Field) {
+    <span class="kw">if </span>field.dtype.is_numeric() &amp;&amp; !<span class="macro">matches!</span>(<span class="kw-2">&amp;</span>field.dtype, DataType::Float32) {
+        field.coerce(DataType::Float64)
+    }
+}
 
 <span class="kw">impl </span>AExpr {
     <span class="doccomment">/// Get Field result of the expression. The schema is the input data.
@@ -275,7 +304,7 @@
             Explode(expr) =&gt; {
                 <span class="kw">let </span>field = arena.get(<span class="kw-2">*</span>expr).to_field(schema, ctxt, arena)<span class="question-mark">?</span>;
 
-                <span class="kw">if let </span>DataType::List(inner) = field.data_type() {
+                <span class="kw">if let </span>List(inner) = field.data_type() {
                     <span class="prelude-val">Ok</span>(Field::new(field.name(), <span class="kw-2">*</span>inner.clone()))
                 } <span class="kw">else </span>{
                     <span class="prelude-val">Ok</span>(field)
@@ -288,12 +317,12 @@
             Column(name) =&gt; {
                 <span class="kw">let </span>field = schema
                     .get_field(name)
-                    .ok_or_else(|| PolarsError::ColumnNotFound(name.to_string().into()));
+                    .ok_or_else(|| <span class="macro">polars_err!</span>(ColumnNotFound: <span class="string">&quot;{}&quot;</span>, name));
 
                 <span class="kw">match </span>ctxt {
                     Context::Default =&gt; field,
                     Context::Aggregation =&gt; field.map(|<span class="kw-2">mut </span>field| {
-                        <span class="kw">let </span>dtype = DataType::List(Box::new(field.data_type().clone()));
+                        <span class="kw">let </span>dtype = List(Box::new(field.data_type().clone()));
                         field.coerce(dtype);
                         field
                     }),
@@ -353,15 +382,13 @@
                     Median(expr) =&gt; {
                         <span class="kw">let </span><span class="kw-2">mut </span>field =
                             arena.get(<span class="kw-2">*</span>expr).to_field(schema, Context::Default, arena)<span class="question-mark">?</span>;
-                        <span class="kw">if </span>field.data_type() != <span class="kw-2">&amp;</span>DataType::Utf8 {
-                            field.coerce(DataType::Float64);
-                        }
+                        float_type(<span class="kw-2">&amp;mut </span>field);
                         <span class="prelude-val">Ok</span>(field)
                     }
                     Mean(expr) =&gt; {
                         <span class="kw">let </span><span class="kw-2">mut </span>field =
                             arena.get(<span class="kw-2">*</span>expr).to_field(schema, Context::Default, arena)<span class="question-mark">?</span>;
-                        coerce_numeric_aggregation(<span class="kw-2">&amp;mut </span>field);
+                        float_type(<span class="kw-2">&amp;mut </span>field);
                         <span class="prelude-val">Ok</span>(field)
                     }
                     List(expr) =&gt; {
@@ -374,13 +401,13 @@
                     Std(expr, <span class="kw">_</span>) =&gt; {
                         <span class="kw">let </span><span class="kw-2">mut </span>field =
                             arena.get(<span class="kw-2">*</span>expr).to_field(schema, Context::Default, arena)<span class="question-mark">?</span>;
-                        coerce_numeric_aggregation(<span class="kw-2">&amp;mut </span>field);
+                        float_type(<span class="kw-2">&amp;mut </span>field);
                         <span class="prelude-val">Ok</span>(field)
                     }
                     Var(expr, <span class="kw">_</span>) =&gt; {
                         <span class="kw">let </span><span class="kw-2">mut </span>field =
                             arena.get(<span class="kw-2">*</span>expr).to_field(schema, Context::Default, arena)<span class="question-mark">?</span>;
-                        coerce_numeric_aggregation(<span class="kw-2">&amp;mut </span>field);
+                        float_type(<span class="kw-2">&amp;mut </span>field);
                         <span class="prelude-val">Ok</span>(field)
                     }
                     NUnique(expr) =&gt; {
@@ -403,7 +430,7 @@
                     Quantile { expr, .. } =&gt; {
                         <span class="kw">let </span><span class="kw-2">mut </span>field =
                             arena.get(<span class="kw-2">*</span>expr).to_field(schema, Context::Default, arena)<span class="question-mark">?</span>;
-                        coerce_numeric_aggregation(<span class="kw-2">&amp;mut </span>field);
+                        float_type(<span class="kw-2">&amp;mut </span>field);
                         <span class="prelude-val">Ok</span>(field)
                     }
                 }
@@ -461,33 +488,52 @@
     ctxt: Context,
     schema: <span class="kw-2">&amp;</span>Schema,
 ) -&gt; PolarsResult&lt;Field&gt; {
+    <span class="kw">use </span>DataType::<span class="kw-2">*</span>;
+    <span class="kw">let </span>left_ae = arena.get(left);
+    <span class="kw">let </span>right_ae = arena.get(right);
+
     <span class="comment">// don&#39;t traverse tree until strictly needed. Can have terrible performance.
     // # 3210
 
     // take the left field as a whole.
     // don&#39;t take dtype and name separate as that splits the tree every node
     // leading to quadratic behavior. # 4736
-    </span><span class="kw">use </span>DataType::<span class="kw-2">*</span>;
-    <span class="kw">let </span><span class="kw-2">mut </span>left_field = arena.get(left).to_field(schema, ctxt, arena)<span class="question-mark">?</span>;
-    <span class="kw">let </span>right_type = arena.get(right).get_type(schema, ctxt, arena)<span class="question-mark">?</span>;
+    //
+    // further right_type is only determined when needed.
+    </span><span class="kw">let </span><span class="kw-2">mut </span>left_field = left_ae.to_field(schema, ctxt, arena)<span class="question-mark">?</span>;
 
     <span class="kw">let </span>super_type = <span class="kw">match </span>op {
-        Operator::Minus =&gt; <span class="kw">match </span>(<span class="kw-2">&amp;</span>left_field.dtype, right_type) {
-            <span class="comment">// T - T != T if T is a datetime / date
-            </span>(Datetime(tul, <span class="kw">_</span>), Datetime(tur, <span class="kw">_</span>)) =&gt; Duration(get_time_units(tul, <span class="kw-2">&amp;</span>tur)),
-            (Date, Date) =&gt; Duration(TimeUnit::Milliseconds),
-            (left, right) =&gt; try_get_supertype(left, <span class="kw-2">&amp;</span>right)<span class="question-mark">?</span>,
-        },
-        <span class="kw">_ </span>=&gt; try_get_supertype(<span class="kw-2">&amp;</span>left_field.dtype, <span class="kw-2">&amp;</span>right_type)<span class="question-mark">?</span>,
+        Operator::Minus =&gt; {
+            <span class="kw">let </span>right_type = right_ae.get_type(schema, ctxt, arena)<span class="question-mark">?</span>;
+            <span class="kw">match </span>(<span class="kw-2">&amp;</span>left_field.dtype, right_type) {
+                <span class="comment">// T - T != T if T is a datetime / date
+                </span>(Datetime(tul, <span class="kw">_</span>), Datetime(tur, <span class="kw">_</span>)) =&gt; Duration(get_time_units(tul, <span class="kw-2">&amp;</span>tur)),
+                (Date, Date) =&gt; Duration(TimeUnit::Milliseconds),
+                (left, right) =&gt; try_get_supertype(left, <span class="kw-2">&amp;</span>right)<span class="question-mark">?</span>,
+            }
+        }
+        <span class="kw">_ </span>=&gt; {
+            <span class="kw">match </span>(left_ae, right_ae) {
+                (AExpr::Literal(<span class="kw">_</span>), AExpr::Literal(<span class="kw">_</span>)) =&gt; {}
+                (AExpr::Literal(<span class="kw">_</span>), <span class="kw">_</span>) =&gt; {
+                    <span class="comment">// literal will be coerced to match right type
+                    </span><span class="kw">let </span>right_type = right_ae.get_type(schema, ctxt, arena)<span class="question-mark">?</span>;
+                    left_field.coerce(right_type);
+                    <span class="kw">return </span><span class="prelude-val">Ok</span>(left_field);
+                }
+                (<span class="kw">_</span>, AExpr::Literal(<span class="kw">_</span>)) =&gt; {
+                    <span class="comment">// literal will be coerced to match right type
+                    </span><span class="kw">return </span><span class="prelude-val">Ok</span>(left_field);
+                }
+                <span class="kw">_ </span>=&gt; {}
+            }
+            <span class="kw">let </span>right_type = right_ae.get_type(schema, ctxt, arena)<span class="question-mark">?</span>;
+            try_get_supertype(<span class="kw-2">&amp;</span>left_field.dtype, <span class="kw-2">&amp;</span>right_type)<span class="question-mark">?
+        </span>}
     };
+
     left_field.coerce(super_type);
     <span class="prelude-val">Ok</span>(left_field)
-}
-
-<span class="kw">fn </span>coerce_numeric_aggregation(field: <span class="kw-2">&amp;mut </span>Field) {
-    <span class="kw">if </span>field.dtype.is_numeric() &amp;&amp; !<span class="macro">matches!</span>(<span class="kw-2">&amp;</span>field.dtype, DataType::Float32) {
-        field.coerce(DataType::Float64)
-    }
 }
 
 <span class="kw">fn </span>get_truediv_field(

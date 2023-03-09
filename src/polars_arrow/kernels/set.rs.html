@@ -139,14 +139,16 @@
 <a href="#139" id="139">139</a>
 <a href="#140" id="140">140</a>
 <a href="#141" id="141">141</a>
+<a href="#142" id="142">142</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::ops::BitOr;
 
 <span class="kw">use </span>arrow::array::<span class="kw-2">*</span>;
 <span class="kw">use </span>arrow::datatypes::DataType;
 <span class="kw">use </span>arrow::types::NativeType;
+<span class="kw">use </span>polars_error::polars_err;
 
 <span class="kw">use </span><span class="kw">crate</span>::array::default_arrays::FromData;
-<span class="kw">use </span><span class="kw">crate</span>::error::{PolarsError, <span class="prelude-ty">Result</span>};
+<span class="kw">use </span><span class="kw">crate</span>::error::PolarsResult;
 <span class="kw">use </span><span class="kw">crate</span>::index::IdxSize;
 <span class="kw">use </span><span class="kw">crate</span>::kernels::BinaryMaskedSliceIterator;
 <span class="kw">use </span><span class="kw">crate</span>::trusted_len::PushUnchecked;
@@ -211,7 +213,7 @@
     idx: I,
     set_value: T,
     data_type: DataType,
-) -&gt; <span class="prelude-ty">Result</span>&lt;PrimitiveArray&lt;T&gt;&gt;
+) -&gt; PolarsResult&lt;PrimitiveArray&lt;T&gt;&gt;
 <span class="kw">where
     </span>T: NativeType,
     I: IntoIterator&lt;Item = IdxSize&gt;,
@@ -220,10 +222,10 @@
     buf.extend_from_slice(array.values().as_slice());
     <span class="kw">let </span>mut_slice = buf.as_mut_slice();
 
-    idx.into_iter().try_for_each::&lt;<span class="kw">_</span>, <span class="prelude-ty">Result</span>&lt;<span class="kw">_</span>&gt;&gt;(|idx| {
+    idx.into_iter().try_for_each::&lt;<span class="kw">_</span>, PolarsResult&lt;<span class="kw">_</span>&gt;&gt;(|idx| {
         <span class="kw">let </span>val = mut_slice
             .get_mut(idx <span class="kw">as </span>usize)
-            .ok_or_else(|| PolarsError::ComputeError(<span class="string">&quot;idx is out of bounds&quot;</span>.into()))<span class="question-mark">?</span>;
+            .ok_or_else(|| <span class="macro">polars_err!</span>(ComputeError: <span class="string">&quot;index is out of bounds&quot;</span>))<span class="question-mark">?</span>;
         <span class="kw-2">*</span>val = set_value;
         <span class="prelude-val">Ok</span>(())
     })<span class="question-mark">?</span>;

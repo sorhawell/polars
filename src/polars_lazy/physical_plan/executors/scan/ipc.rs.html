@@ -60,7 +60,11 @@
 <a href="#60" id="60">60</a>
 <a href="#61" id="61">61</a>
 <a href="#62" id="62">62</a>
-</pre><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href="#63" id="63">63</a>
+<a href="#64" id="64">64</a>
+</pre><pre class="rust"><code><span class="kw">use </span>std::path::PathBuf;
+
+<span class="kw">use super</span>::<span class="kw-2">*</span>;
 
 <span class="kw">pub struct </span>IpcExec {
     <span class="kw">pub</span>(<span class="kw">crate</span>) path: PathBuf,
@@ -100,11 +104,11 @@
         };
 
         <span class="kw">let </span>profile_name = <span class="kw">if </span>state.has_node_timer() {
-            <span class="kw">let </span><span class="kw-2">mut </span>ids = <span class="macro">vec!</span>[<span class="self">self</span>.path.to_string_lossy().to_string()];
+            <span class="kw">let </span><span class="kw-2">mut </span>ids = <span class="macro">vec!</span>[<span class="self">self</span>.path.to_string_lossy().into()];
             <span class="kw">if </span><span class="self">self</span>.predicate.is_some() {
-                ids.push(<span class="string">&quot;predicate&quot;</span>.to_string())
+                ids.push(<span class="string">&quot;predicate&quot;</span>.into())
             }
-            <span class="kw">let </span>name = column_delimited(<span class="string">&quot;ipc&quot;</span>.to_string(), <span class="kw-2">&amp;</span>ids);
+            <span class="kw">let </span>name = comma_delimited(<span class="string">&quot;ipc&quot;</span>.to_string(), <span class="kw-2">&amp;</span>ids);
             Cow::Owned(name)
         } <span class="kw">else </span>{
             Cow::Borrowed(<span class="string">&quot;&quot;</span>)

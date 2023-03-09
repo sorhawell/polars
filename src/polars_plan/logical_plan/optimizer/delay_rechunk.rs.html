@@ -92,6 +92,7 @@
 <a href="#92" id="92">92</a>
 <a href="#93" id="93">93</a>
 <a href="#94" id="94">94</a>
+<a href="#95" id="95">95</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::collections::BTreeSet;
 
 <span class="kw">use </span>polars_utils::arena::{Arena, Node};
@@ -118,6 +119,7 @@
     ) -&gt; <span class="prelude-ty">Option</span>&lt;ALogicalPlan&gt; {
         <span class="kw">match </span>lp_arena.get(node) {
             <span class="comment">// An aggregation can be partitioned, its wasteful to rechunk before that partition.
+            </span><span class="attr">#[allow(unused_mut)]
             </span>ALogicalPlan::Aggregate { input, .. } =&gt; {
                 <span class="kw">if </span>!<span class="self">self</span>.processed.insert(node.<span class="number">0</span>) {
                     <span class="kw">return </span><span class="prelude-val">None</span>;

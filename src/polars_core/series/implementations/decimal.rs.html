@@ -196,18 +196,22 @@
 <span class="kw">impl </span>SeriesWrap&lt;DecimalChunked&gt; {
     <span class="kw">fn </span>apply_logical&lt;F: Fn(<span class="kw-2">&amp;</span>Int128Chunked) -&gt; Int128Chunked&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, f: F) -&gt; Series {
         f(<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>)
-            .into_decimal(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
+            .into_decimal_unchecked(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
             .into_series()
     }
 }
 
 <span class="kw">impl </span>private::PrivateSeries <span class="kw">for </span>SeriesWrap&lt;DecimalChunked&gt; {
+    <span class="kw">fn </span>compute_len(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.<span class="number">0</span>.compute_len()
+    }
+
     <span class="kw">fn </span>_field(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Cow&lt;Field&gt; {
-        Cow::Borrowed(<span class="self">self</span>.<span class="number">0</span>.field.as_ref())
+        Cow::Owned(<span class="self">self</span>.<span class="number">0</span>.field())
     }
 
     <span class="kw">fn </span>_dtype(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>DataType {
-        <span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>.field.dtype
+        <span class="self">self</span>.<span class="number">0</span>.dtype()
     }
 }
 
@@ -229,39 +233,29 @@
     }
 
     <span class="kw">fn </span>append(<span class="kw-2">&amp;mut </span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Series) -&gt; PolarsResult&lt;()&gt; {
-        <span class="kw">if </span><span class="self">self</span>.<span class="number">0</span>.dtype() == other.dtype() {
-            <span class="self">self</span>.<span class="number">0</span>.append(other.as_ref().as_ref());
-            <span class="prelude-val">Ok</span>(())
-        } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(PolarsError::SchemaMisMatch(
-                <span class="string">&quot;cannot append Series; data types don&#39;t match&quot;</span>.into(),
-            ))
-        }
+        <span class="macro">polars_ensure!</span>(<span class="self">self</span>.<span class="number">0</span>.dtype() == other.dtype(), append);
+        <span class="self">self</span>.<span class="number">0</span>.append(other.as_ref().as_ref());
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">fn </span>extend(<span class="kw-2">&amp;mut </span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Series) -&gt; PolarsResult&lt;()&gt; {
-        <span class="kw">if </span><span class="self">self</span>.<span class="number">0</span>.dtype() == other.dtype() {
-            <span class="self">self</span>.<span class="number">0</span>.extend(other.as_ref().as_ref());
-            <span class="prelude-val">Ok</span>(())
-        } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(PolarsError::SchemaMisMatch(
-                <span class="string">&quot;cannot extend Series; data types don&#39;t match&quot;</span>.into(),
-            ))
-        }
+        <span class="macro">polars_ensure!</span>(<span class="self">self</span>.<span class="number">0</span>.dtype() == other.dtype(), extend);
+        <span class="self">self</span>.<span class="number">0</span>.extend(other.as_ref().as_ref());
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">fn </span>filter(<span class="kw-2">&amp;</span><span class="self">self</span>, filter: <span class="kw-2">&amp;</span>BooleanChunked) -&gt; PolarsResult&lt;Series&gt; {
         <span class="prelude-val">Ok</span>(<span class="self">self
             </span>.<span class="number">0
             </span>.filter(filter)<span class="question-mark">?
-            </span>.into_decimal(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
+            </span>.into_decimal_unchecked(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
             .into_series())
     }
 
     <span class="attr">#[cfg(feature = <span class="string">&quot;chunked_ids&quot;</span>)]
     </span><span class="kw">unsafe fn </span>_take_chunked_unchecked(<span class="kw-2">&amp;</span><span class="self">self</span>, by: <span class="kw-2">&amp;</span>[ChunkId], sorted: IsSorted) -&gt; Series {
         <span class="kw">let </span>ca = <span class="self">self</span>.<span class="number">0</span>.deref().take_chunked_unchecked(by, sorted);
-        ca.into_decimal(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
+        ca.into_decimal_unchecked(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
             .into_series()
     }
 
@@ -272,14 +266,14 @@
 
     <span class="kw">fn </span>take_iter(<span class="kw-2">&amp;</span><span class="self">self</span>, iter: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>TakeIterator) -&gt; PolarsResult&lt;Series&gt; {
         ChunkTake::take(<span class="self">self</span>.<span class="number">0</span>.deref(), iter.into()).map(|ca| {
-            ca.into_decimal(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
+            ca.into_decimal_unchecked(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
                 .into_series()
         })
     }
 
     <span class="kw">unsafe fn </span>take_iter_unchecked(<span class="kw-2">&amp;</span><span class="self">self</span>, iter: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>TakeIterator) -&gt; Series {
         ChunkTake::take_unchecked(<span class="self">self</span>.<span class="number">0</span>.deref(), iter.into())
-            .into_decimal(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
+            .into_decimal_unchecked(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
             .into_series()
     }
 
@@ -293,19 +287,19 @@
         }
 
         <span class="prelude-val">Ok</span>(out
-            .into_decimal(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
+            .into_decimal_unchecked(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
             .into_series())
     }
 
     <span class="kw">unsafe fn </span>take_opt_iter_unchecked(<span class="kw-2">&amp;</span><span class="self">self</span>, iter: <span class="kw-2">&amp;mut </span><span class="kw">dyn </span>TakeIteratorNulls) -&gt; Series {
         ChunkTake::take_unchecked(<span class="self">self</span>.<span class="number">0</span>.deref(), iter.into())
-            .into_decimal(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
+            .into_decimal_unchecked(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
             .into_series()
     }
 
     <span class="kw">fn </span>take(<span class="kw-2">&amp;</span><span class="self">self</span>, indices: <span class="kw-2">&amp;</span>IdxCa) -&gt; PolarsResult&lt;Series&gt; {
         ChunkTake::take(<span class="self">self</span>.<span class="number">0</span>.deref(), indices.into()).map(|ca| {
-            ca.into_decimal(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
+            ca.into_decimal_unchecked(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
                 .into_series()
         })
     }
@@ -316,21 +310,21 @@
 
     <span class="kw">fn </span>rechunk(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Series {
         <span class="kw">let </span>ca = <span class="self">self</span>.<span class="number">0</span>.rechunk();
-        ca.into_decimal(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
+        ca.into_decimal_unchecked(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
             .into_series()
     }
 
     <span class="kw">fn </span>take_every(<span class="kw-2">&amp;</span><span class="self">self</span>, n: usize) -&gt; Series {
         <span class="self">self</span>.<span class="number">0
             </span>.take_every(n)
-            .into_decimal(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
+            .into_decimal_unchecked(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
             .into_series()
     }
 
     <span class="kw">fn </span>new_from_index(<span class="kw-2">&amp;</span><span class="self">self</span>, index: usize, length: usize) -&gt; Series {
         <span class="self">self</span>.<span class="number">0
             </span>.new_from_index(index, length)
-            .into_decimal(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
+            .into_decimal_unchecked(<span class="self">self</span>.<span class="number">0</span>.precision(), <span class="self">self</span>.<span class="number">0</span>.scale())
             .into_series()
     }
 
@@ -338,8 +332,14 @@
         <span class="self">self</span>.<span class="number">0</span>.cast(data_type)
     }
 
-    <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, _index: usize) -&gt; PolarsResult&lt;AnyValue&gt; {
-        <span class="macro">todo!</span>()
+    <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, index: usize) -&gt; PolarsResult&lt;AnyValue&gt; {
+        <span class="self">self</span>.<span class="number">0</span>.get_any_value(index)
+    }
+
+    <span class="attr">#[inline]
+    #[cfg(feature = <span class="string">&quot;private&quot;</span>)]
+    </span><span class="kw">unsafe fn </span>get_unchecked(<span class="kw-2">&amp;</span><span class="self">self</span>, index: usize) -&gt; AnyValue {
+        <span class="self">self</span>.<span class="number">0</span>.get_any_value_unchecked(index)
     }
 
     <span class="kw">fn </span>null_count(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {

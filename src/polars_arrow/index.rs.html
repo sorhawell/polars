@@ -50,7 +50,7 @@
 </span><span class="kw">use </span>arrow::array::UInt32Array;
 <span class="attr">#[cfg(feature = <span class="string">&quot;bigidx&quot;</span>)]
 </span><span class="kw">use </span>arrow::array::UInt64Array;
-<span class="kw">use </span>num::{NumCast, Signed, Zero};
+<span class="kw">use </span>num_traits::{NumCast, Signed, Zero};
 
 <span class="kw">pub trait </span>IndexToUsize {
     <span class="doccomment">/// Translate the negative index to an offset.

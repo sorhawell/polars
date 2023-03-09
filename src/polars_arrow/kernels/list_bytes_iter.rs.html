@@ -54,15 +54,12 @@
 <a href="#54" id="54">54</a>
 <a href="#55" id="55">55</a>
 <a href="#56" id="56">56</a>
-<a href="#57" id="57">57</a>
-<a href="#58" id="58">58</a>
-<a href="#59" id="59">59</a>
 </pre><pre class="rust"><code><span class="kw">use </span>arrow::array::{ListArray, PrimitiveArray};
 <span class="kw">use </span>arrow::bitmap::Bitmap;
 <span class="kw">use </span>arrow::datatypes::PhysicalType::Primitive;
 <span class="kw">use </span>arrow::types::NativeType;
+<span class="kw">use </span>polars_error::{polars_bail, polars_ensure, PolarsResult};
 
-<span class="kw">use </span><span class="kw">crate</span>::error::PolarsError;
 <span class="kw">use </span><span class="kw">crate</span>::utils::with_match_primitive_type;
 
 <span class="kw">unsafe fn </span>bytes_iter&lt;<span class="lifetime">&#39;a</span>, T: NativeType&gt;(
@@ -93,13 +90,12 @@
 
 <span class="kw">pub fn </span>numeric_list_bytes_iter(
     arr: <span class="kw-2">&amp;</span>ListArray&lt;i64&gt;,
-) -&gt; <span class="prelude-ty">Result</span>&lt;Box&lt;<span class="kw">dyn </span>ExactSizeIterator&lt;Item = <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>[u8]&gt;&gt; + <span class="lifetime">&#39;_</span>&gt;, PolarsError&gt; {
+) -&gt; PolarsResult&lt;Box&lt;<span class="kw">dyn </span>ExactSizeIterator&lt;Item = <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>[u8]&gt;&gt; + <span class="lifetime">&#39;_</span>&gt;&gt; {
     <span class="kw">let </span>values = arr.values();
-    <span class="kw">if </span>values.null_count() &gt; <span class="number">0 </span>{
-        <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(
-            <span class="string">&quot;only allowed for child arrays without nulls&quot;</span>.into(),
-        ));
-    }
+    <span class="macro">polars_ensure!</span>(
+        values.null_count() == <span class="number">0</span>,
+        ComputeError: <span class="string">&quot;only allowed for child arrays without nulls&quot;
+    </span>);
     <span class="kw">let </span>offsets = arr.offsets().as_slice();
     <span class="kw">let </span>validity = arr.validity();
 
@@ -111,9 +107,7 @@
             <span class="prelude-val">Ok</span>(Box::new(iter))
         })
     } <span class="kw">else </span>{
-        <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-            <span class="string">&quot;only allowed for numeric child arrays&quot;</span>.into(),
-        ))
+        <span class="macro">polars_bail!</span>(ComputeError: <span class="string">&quot;only allowed for numeric child arrays&quot;</span>);
     }
 }
 </code></pre></div>

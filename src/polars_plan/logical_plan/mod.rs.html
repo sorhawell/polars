@@ -437,19 +437,6 @@
 <a href="#437" id="437">437</a>
 <a href="#438" id="438">438</a>
 <a href="#439" id="439">439</a>
-<a href="#440" id="440">440</a>
-<a href="#441" id="441">441</a>
-<a href="#442" id="442">442</a>
-<a href="#443" id="443">443</a>
-<a href="#444" id="444">444</a>
-<a href="#445" id="445">445</a>
-<a href="#446" id="446">446</a>
-<a href="#447" id="447">447</a>
-<a href="#448" id="448">448</a>
-<a href="#449" id="449">449</a>
-<a href="#450" id="450">450</a>
-<a href="#451" id="451">451</a>
-<a href="#452" id="452">452</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::borrow::Cow;
 <span class="kw">use </span>std::fmt::Debug;
 <span class="attr">#[cfg(any(feature = <span class="string">&quot;ipc&quot;</span>, feature = <span class="string">&quot;csv-file&quot;</span>, feature = <span class="string">&quot;parquet&quot;</span>))]
@@ -494,7 +481,6 @@
 <span class="kw">pub use </span>iterator::<span class="kw-2">*</span>;
 <span class="kw">pub use </span>lit::<span class="kw-2">*</span>;
 <span class="kw">pub use </span>optimizer::<span class="kw-2">*</span>;
-<span class="kw">use </span>polars_core::frame::explode::MeltArgs;
 <span class="kw">pub use </span>schema::<span class="kw-2">*</span>;
 <span class="attr">#[cfg(feature = <span class="string">&quot;serde&quot;</span>)]
 </span><span class="kw">use </span>serde::{Deserialize, Serialize};
@@ -550,9 +536,11 @@
                 };
                 err
             }
-            ErrorState::AlreadyEncountered { prev_err_msg } =&gt; PolarsError::ComputeError(
-                <span class="macro">format!</span>(<span class="string">&quot;LogicalPlan already failed with error: `{prev_err_msg}`&quot;</span>).into(),
-            ),
+            ErrorState::AlreadyEncountered { prev_err_msg } =&gt; {
+                <span class="macro">polars_err!</span>(
+                    ComputeError: <span class="string">&quot;LogicalPlan already failed with error: &#39;{}&#39;&quot;</span>, prev_err_msg,
+                )
+            }
         }
     }
 }
@@ -672,23 +660,11 @@
         by_column: Vec&lt;Expr&gt;,
         args: SortArguments,
     },
-    <span class="doccomment">/// An explode operation
-    </span>Explode {
-        input: Box&lt;LogicalPlan&gt;,
-        columns: Vec&lt;String&gt;,
-        schema: SchemaRef,
-    },
     <span class="doccomment">/// Slice the table
     </span>Slice {
         input: Box&lt;LogicalPlan&gt;,
         offset: i64,
         len: IdxSize,
-    },
-    <span class="doccomment">/// A Melt operation
-    </span>Melt {
-        input: Box&lt;LogicalPlan&gt;,
-        args: Arc&lt;MeltArgs&gt;,
-        schema: SchemaRef,
     },
     <span class="doccomment">/// A (User Defined) Function
     </span>MapFunction {
@@ -750,7 +726,6 @@
             Union { inputs, .. } =&gt; inputs[<span class="number">0</span>].schema(),
             Cache { input, .. } =&gt; input.schema(),
             Sort { input, .. } =&gt; input.schema(),
-            Explode { schema, .. } =&gt; <span class="prelude-val">Ok</span>(Cow::Borrowed(schema)),
             <span class="attr">#[cfg(feature = <span class="string">&quot;parquet&quot;</span>)]
             </span>ParquetScan { file_info, .. } =&gt; <span class="prelude-val">Ok</span>(Cow::Borrowed(<span class="kw-2">&amp;</span>file_info.schema)),
             <span class="attr">#[cfg(feature = <span class="string">&quot;ipc&quot;</span>)]
@@ -767,7 +742,6 @@
             HStack { schema, .. } =&gt; <span class="prelude-val">Ok</span>(Cow::Borrowed(schema)),
             Distinct { input, .. } | FileSink { input, .. } =&gt; input.schema(),
             Slice { input, .. } =&gt; input.schema(),
-            Melt { schema, .. } =&gt; <span class="prelude-val">Ok</span>(Cow::Borrowed(schema)),
             MapFunction {
                 input, function, ..
             } =&gt; {

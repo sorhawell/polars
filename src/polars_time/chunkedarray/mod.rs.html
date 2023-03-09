@@ -35,6 +35,7 @@
 <a href="#35" id="35">35</a>
 <a href="#36" id="36">36</a>
 <a href="#37" id="37">37</a>
+<a href="#38" id="38">38</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Traits and utilities for temporal data.
 </span><span class="attr">#[cfg(feature = <span class="string">&quot;dtype-date&quot;</span>)]
 </span><span class="kw">mod </span>date;
@@ -68,6 +69,7 @@
 }
 
 <span class="comment">// a separate function so that it is not compiled twice
+</span><span class="attr">#[cfg(any(feature = <span class="string">&quot;dtype-date&quot;</span>, feature = <span class="string">&quot;dtype-datetime&quot;</span>))]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>months_to_quarters(<span class="kw-2">mut </span>ca: UInt32Chunked) -&gt; UInt32Chunked {
     ca.apply_mut(|month| (month + <span class="number">2</span>) / <span class="number">3</span>);
     ca

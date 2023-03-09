@@ -399,11 +399,6 @@
 <a href="#399" id="399">399</a>
 <a href="#400" id="400">400</a>
 <a href="#401" id="401">401</a>
-<a href="#402" id="402">402</a>
-<a href="#403" id="403">403</a>
-<a href="#404" id="404">404</a>
-<a href="#405" id="405">405</a>
-<a href="#406" id="406">406</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::borrow::Cow;
 
 <span class="kw">use </span>ahash::RandomState;
@@ -495,7 +490,11 @@
             .map(|ca| ca.into_series())
     }
     <span class="kw">fn </span>into_partial_ord_inner&lt;<span class="lifetime">&#39;a</span>&gt;(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span><span class="self">self</span>) -&gt; Box&lt;<span class="kw">dyn </span>PartialOrdInner + <span class="lifetime">&#39;a</span>&gt; {
-        (<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>).into_partial_ord_inner()
+        <span class="kw">if </span><span class="self">self</span>.<span class="number">0</span>.use_lexical_sort() {
+            (<span class="kw-2">&amp;</span><span class="self">self</span>.<span class="number">0</span>).into_partial_ord_inner()
+        } <span class="kw">else </span>{
+            <span class="self">self</span>.<span class="number">0</span>.logical().into_partial_ord_inner()
+        }
     }
 
     <span class="kw">fn </span>vec_hash(<span class="kw-2">&amp;</span><span class="self">self</span>, random_state: RandomState, buf: <span class="kw-2">&amp;mut </span>Vec&lt;u64&gt;) -&gt; PolarsResult&lt;()&gt; {
@@ -586,28 +585,19 @@
     }
 
     <span class="kw">fn </span>append(<span class="kw-2">&amp;mut </span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Series) -&gt; PolarsResult&lt;()&gt; {
-        <span class="kw">if </span><span class="self">self</span>.<span class="number">0</span>.dtype() == other.dtype() {
-            <span class="self">self</span>.<span class="number">0</span>.append(other.categorical().unwrap())
-        } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(PolarsError::SchemaMisMatch(
-                <span class="string">&quot;cannot append Series; data types don&#39;t match&quot;</span>.into(),
-            ))
-        }
+        <span class="macro">polars_ensure!</span>(<span class="self">self</span>.<span class="number">0</span>.dtype() == other.dtype(), append);
+        <span class="self">self</span>.<span class="number">0</span>.append(other.categorical().unwrap())
     }
+
     <span class="kw">fn </span>extend(<span class="kw-2">&amp;mut </span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Series) -&gt; PolarsResult&lt;()&gt; {
-        <span class="kw">if </span><span class="self">self</span>.<span class="number">0</span>.dtype() == other.dtype() {
-            <span class="kw">let </span>other = other.categorical()<span class="question-mark">?</span>;
-            <span class="self">self</span>.<span class="number">0</span>.logical_mut().extend(other.logical());
-            <span class="kw">let </span>new_rev_map = <span class="self">self</span>.<span class="number">0</span>.merge_categorical_map(other)<span class="question-mark">?</span>;
-            <span class="comment">// safety:
-            // rev_maps are merged
-            </span><span class="kw">unsafe </span>{ <span class="self">self</span>.<span class="number">0</span>.set_rev_map(new_rev_map, <span class="bool-val">false</span>) };
-            <span class="prelude-val">Ok</span>(())
-        } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(PolarsError::SchemaMisMatch(
-                <span class="string">&quot;cannot extend Series; data types don&#39;t match&quot;</span>.into(),
-            ))
-        }
+        <span class="macro">polars_ensure!</span>(<span class="self">self</span>.<span class="number">0</span>.dtype() == other.dtype(), extend);
+        <span class="kw">let </span>other = other.categorical()<span class="question-mark">?</span>;
+        <span class="self">self</span>.<span class="number">0</span>.logical_mut().extend(other.logical());
+        <span class="kw">let </span>new_rev_map = <span class="self">self</span>.<span class="number">0</span>.merge_categorical_map(other)<span class="question-mark">?</span>;
+        <span class="comment">// SAFETY
+        // rev_maps are merged
+        </span><span class="kw">unsafe </span>{ <span class="self">self</span>.<span class="number">0</span>.set_rev_map(new_rev_map, <span class="bool-val">false</span>) };
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">fn </span>filter(<span class="kw-2">&amp;</span><span class="self">self</span>, filter: <span class="kw-2">&amp;</span>BooleanChunked) -&gt; PolarsResult&lt;Series&gt; {

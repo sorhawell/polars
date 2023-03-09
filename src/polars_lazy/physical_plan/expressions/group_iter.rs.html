@@ -114,6 +114,18 @@
 <a href="#114" id="114">114</a>
 <a href="#115" id="115">115</a>
 <a href="#116" id="116">116</a>
+<a href="#117" id="117">117</a>
+<a href="#118" id="118">118</a>
+<a href="#119" id="119">119</a>
+<a href="#120" id="120">120</a>
+<a href="#121" id="121">121</a>
+<a href="#122" id="122">122</a>
+<a href="#123" id="123">123</a>
+<a href="#124" id="124">124</a>
+<a href="#125" id="125">125</a>
+<a href="#126" id="126">126</a>
+<a href="#127" id="127">127</a>
+<a href="#128" id="128">128</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::pin::Pin;
 
 <span class="kw">use </span>polars_core::series::unstable::UnstableSeries;
@@ -133,7 +145,11 @@
             AggState::AggregatedFlat(<span class="kw">_</span>) =&gt; {
                 <span class="self">self</span>.groups();
                 <span class="kw">let </span>s = <span class="self">self</span>.series();
-                Box::new(FlatIter::new(s.array_ref(<span class="number">0</span>).clone(), <span class="self">self</span>.groups.len()))
+                Box::new(FlatIter::new(
+                    s.array_ref(<span class="number">0</span>).clone(),
+                    <span class="self">self</span>.groups.len(),
+                    s.dtype(),
+                ))
             }
             AggState::AggregatedList(<span class="kw">_</span>) =&gt; {
                 <span class="kw">let </span>s = <span class="self">self</span>.series();
@@ -202,8 +218,13 @@
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; FlatIter&lt;<span class="lifetime">&#39;a</span>&gt; {
-    <span class="kw">fn </span>new(array: ArrayRef, len: usize) -&gt; <span class="self">Self </span>{
-        <span class="kw">let </span><span class="kw-2">mut </span>series_container = Box::pin(Series::try_from((<span class="string">&quot;&quot;</span>, array.clone())).unwrap());
+    <span class="kw">fn </span>new(array: ArrayRef, len: usize, logical: <span class="kw-2">&amp;</span>DataType) -&gt; <span class="self">Self </span>{
+        <span class="kw">let </span><span class="kw-2">mut </span>series_container = Box::pin(
+            Series::try_from((<span class="string">&quot;&quot;</span>, array.clone()))
+                .unwrap()
+                .cast(logical)
+                .unwrap(),
+        );
         <span class="kw">let </span>ref_s = <span class="kw-2">&amp;mut *</span>series_container <span class="kw">as </span><span class="kw-2">*mut </span>Series;
         <span class="self">Self </span>{
             array,
@@ -228,6 +249,9 @@
             <span class="self">self</span>.item.swap(<span class="kw-2">&amp;mut </span>arr);
             <span class="prelude-val">Some</span>(<span class="prelude-val">Some</span>(<span class="self">self</span>.item))
         }
+    }
+    <span class="kw">fn </span>size_hint(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; (usize, <span class="prelude-ty">Option</span>&lt;usize&gt;) {
+        (<span class="self">self</span>.len, <span class="prelude-val">Some</span>(<span class="self">self</span>.offset))
     }
 }
 </code></pre></div>

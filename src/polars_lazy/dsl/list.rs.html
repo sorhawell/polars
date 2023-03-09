@@ -132,6 +132,8 @@
 <a href="#132" id="132">132</a>
 <a href="#133" id="133">133</a>
 <a href="#134" id="134">134</a>
+<a href="#135" id="135">135</a>
+<a href="#136" id="136">136</a>
 </pre><pre class="rust"><code><span class="attr">#[cfg(feature = <span class="string">&quot;list_eval&quot;</span>)]
 </span><span class="kw">use </span>std::sync::Mutex;
 
@@ -174,14 +176,16 @@
                         data_type: DataType::Categorical(<span class="kw">_</span>),
                         ..
                     } =&gt; {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                            <span class="string">&quot;Casting to &#39;Categorical&#39; not allowed in &#39;arr.eval&#39;&quot;</span>.into(),
-                        ))
+                        <span class="macro">polars_bail!</span>(
+                            ComputeError: <span class="string">&quot;casting to categorical not allowed in `arr.eval`&quot;
+                        </span>)
                     }
                     Expr::Column(name) =&gt; {
-                        <span class="kw">if </span>!name.is_empty() {
-                            <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(<span class="string">r#&quot;Named columns not allowed in &#39;arr.eval&#39;. Consider using &#39;element&#39; or &#39;col(&quot;&quot;)&#39;.&quot;#</span>.into()));
-                        }
+                        <span class="macro">polars_ensure!</span>(
+                            name.is_empty(),
+                            ComputeError:
+                            <span class="string">&quot;named columns are not allowed in `arr.eval`; consider using `element` or `col(\&quot;\&quot;)`&quot;
+                        </span>);
                     }
                     <span class="kw">_ </span>=&gt; {}
                 }

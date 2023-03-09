@@ -1182,16 +1182,11 @@
 <a href="#1182" id="1182">1182</a>
 <a href="#1183" id="1183">1183</a>
 <a href="#1184" id="1184">1184</a>
-<a href="#1185" id="1185">1185</a>
-<a href="#1186" id="1186">1186</a>
-<a href="#1187" id="1187">1187</a>
-<a href="#1188" id="1188">1188</a>
-<a href="#1189" id="1189">1189</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::fmt::{Debug, Display, Formatter};
 <span class="kw">use </span>std::hash::Hash;
 
 <span class="kw">use </span>ahash::RandomState;
-<span class="kw">use </span>num::NumCast;
+<span class="kw">use </span>num_traits::NumCast;
 <span class="kw">use </span>polars_arrow::prelude::QuantileInterpolOptions;
 <span class="kw">use </span>rayon::prelude::<span class="kw-2">*</span>;
 
@@ -1241,24 +1236,20 @@
         multithreaded: bool,
         sorted: bool,
     ) -&gt; PolarsResult&lt;GroupBy&gt; {
-        <span class="kw">if </span>by.is_empty() {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                <span class="string">&quot;expected keys in groupby operation, got nothing&quot;</span>.into(),
-            ));
-        }
-
+        <span class="macro">polars_ensure!</span>(
+            !by.is_empty(),
+            ComputeError: <span class="string">&quot;at least one key is required in a groupby operation&quot;
+        </span>);
         <span class="kw">let </span>by_len = by[<span class="number">0</span>].len();
 
         <span class="comment">// we only throw this error if self.width &gt; 0
         // so that we can still call this on a dummy dataframe where we provide the keys
         </span><span class="kw">if </span>(by_len != <span class="self">self</span>.height()) &amp;&amp; (<span class="self">self</span>.width() &gt; <span class="number">0</span>) {
-            <span class="kw">if </span>by_len == <span class="number">1 </span>{
-                by[<span class="number">0</span>] = by[<span class="number">0</span>].new_from_index(<span class="number">0</span>, <span class="self">self</span>.height())
-            } <span class="kw">else </span>{
-                <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ShapeMisMatch(
-                    <span class="string">&quot;the Series used as keys should have the same length as the DataFrame&quot;</span>.into(),
-                ));
-            }
+            <span class="macro">polars_ensure!</span>(
+                by_len == <span class="number">1</span>,
+                ShapeMismatch: <span class="string">&quot;series used as keys should have the same length as the dataframe&quot;
+            </span>);
+            by[<span class="number">0</span>] = by[<span class="number">0</span>].new_from_index(<span class="number">0</span>, <span class="self">self</span>.height())
         };
 
         <span class="kw">let </span>n_partitions = _set_partition_size();
@@ -1778,11 +1769,10 @@
         quantile: f64,
         interpol: QuantileInterpolOptions,
     ) -&gt; PolarsResult&lt;DataFrame&gt; {
-        <span class="kw">if </span>!(<span class="number">0.0</span>..=<span class="number">1.0</span>).contains(<span class="kw-2">&amp;</span>quantile) {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                <span class="string">&quot;quantile should be within 0.0 and 1.0&quot;</span>.into(),
-            ));
-        }
+        <span class="macro">polars_ensure!</span>(
+            (<span class="number">0.0</span>..=<span class="number">1.0</span>).contains(<span class="kw-2">&amp;</span>quantile),
+            ComputeError: <span class="string">&quot;`quantile` should be within 0.0 and 1.0&quot;
+        </span>);
         <span class="kw">let </span>(<span class="kw-2">mut </span>cols, agg_cols) = <span class="self">self</span>.prepare_agg()<span class="question-mark">?</span>;
         <span class="kw">for </span>agg_col <span class="kw">in </span>agg_cols {
             <span class="kw">let </span>new_name =
@@ -2090,7 +2080,7 @@
 
 <span class="attr">#[cfg(test)]
 </span><span class="kw">mod </span>test {
-    <span class="kw">use </span>num::traits::FloatConst;
+    <span class="kw">use </span>num_traits::FloatConst;
 
     <span class="kw">use </span><span class="kw">crate</span>::frame::groupby::{groupby, groupby_threaded_num};
     <span class="kw">use </span><span class="kw">crate</span>::prelude::<span class="kw-2">*</span>;

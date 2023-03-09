@@ -197,21 +197,15 @@
 <a href="#197" id="197">197</a>
 <a href="#198" id="198">198</a>
 <a href="#199" id="199">199</a>
-<a href="#200" id="200">200</a>
-<a href="#201" id="201">201</a>
-<a href="#202" id="202">202</a>
-<a href="#203" id="203">203</a>
-<a href="#204" id="204">204</a>
-<a href="#205" id="205">205</a>
 </pre><pre class="rust"><code><span class="kw">mod </span>asof;
 <span class="kw">mod </span>groups;
-
 <span class="kw">use </span>std::borrow::Cow;
 
 <span class="kw">use </span>asof::<span class="kw-2">*</span>;
-<span class="kw">use </span>num::Bounded;
+<span class="kw">use </span>num_traits::Bounded;
 <span class="attr">#[cfg(feature = <span class="string">&quot;serde&quot;</span>)]
 </span><span class="kw">use </span>serde::{Deserialize, Serialize};
+<span class="kw">use </span>smartstring::alias::String <span class="kw">as </span>SmartString;
 
 <span class="kw">use </span><span class="kw">crate</span>::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::utils::slice_slice;
@@ -227,28 +221,22 @@
     /// - &quot;2h15m&quot;
     /// - &quot;1d6h&quot;
     /// etc
-    </span><span class="kw">pub </span>tolerance_str: <span class="prelude-ty">Option</span>&lt;String&gt;,
-    <span class="kw">pub </span>left_by: <span class="prelude-ty">Option</span>&lt;Vec&lt;String&gt;&gt;,
-    <span class="kw">pub </span>right_by: <span class="prelude-ty">Option</span>&lt;Vec&lt;String&gt;&gt;,
+    </span><span class="kw">pub </span>tolerance_str: <span class="prelude-ty">Option</span>&lt;SmartString&gt;,
+    <span class="kw">pub </span>left_by: <span class="prelude-ty">Option</span>&lt;Vec&lt;SmartString&gt;&gt;,
+    <span class="kw">pub </span>right_by: <span class="prelude-ty">Option</span>&lt;Vec&lt;SmartString&gt;&gt;,
 }
 
 <span class="kw">fn </span>check_asof_columns(a: <span class="kw-2">&amp;</span>Series, b: <span class="kw-2">&amp;</span>Series) -&gt; PolarsResult&lt;()&gt; {
-    <span class="kw">if </span>a.dtype() != b.dtype() {
-        <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-            <span class="macro">format!</span>(
-                <span class="string">&quot;keys used in asof-join must have equal dtypes. We got: left: {:?}\tright: {:?}&quot;</span>,
-                a.dtype(),
-                b.dtype()
-            )
-            .into(),
-        ))
-    } <span class="kw">else if </span>a.null_count() &gt; <span class="number">0 </span>|| b.null_count() &gt; <span class="number">0 </span>{
-        <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-            <span class="string">&quot;asof join must not have null values in &#39;on&#39; arguments&quot;</span>.into(),
-        ))
-    } <span class="kw">else </span>{
-        <span class="prelude-val">Ok</span>(())
-    }
+    <span class="macro">polars_ensure!</span>(
+        a.dtype() == b.dtype(),
+        ComputeError: <span class="string">&quot;mismatching key dtypes in asof-join: `{}` and `{}`&quot;</span>,
+        a.dtype(), b.dtype()
+    );
+    <span class="macro">polars_ensure!</span>(
+        a.null_count() == <span class="number">0 </span>&amp;&amp; b.null_count() == <span class="number">0</span>,
+        ComputeError: <span class="string">&quot;asof join must not have null values in &#39;on&#39; arguments&quot;
+    </span>);
+    <span class="prelude-val">Ok</span>(())
 }
 
 <span class="attr">#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]

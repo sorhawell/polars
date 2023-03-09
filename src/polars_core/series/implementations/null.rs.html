@@ -174,11 +174,6 @@
 <a href="#174" id="174">174</a>
 <a href="#175" id="175">175</a>
 <a href="#176" id="176">176</a>
-<a href="#177" id="177">177</a>
-<a href="#178" id="178">178</a>
-<a href="#179" id="179">179</a>
-<a href="#180" id="180">180</a>
-<a href="#181" id="181">181</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::borrow::Cow;
 <span class="kw">use </span>std::sync::Arc;
 
@@ -244,6 +239,10 @@
         <span class="kw-2">&amp;</span><span class="self">self</span>.chunks
     }
 
+    <span class="kw">fn </span>chunk_lengths(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; ChunkIdIter {
+        <span class="self">self</span>.chunks.iter().map(|chunk| chunk.len())
+    }
+
     <span class="attr">#[cfg(feature = <span class="string">&quot;chunked_ids&quot;</span>)]
     </span><span class="kw">unsafe fn </span>_take_chunked_unchecked(<span class="kw-2">&amp;</span><span class="self">self</span>, by: <span class="kw-2">&amp;</span>[ChunkId], _sorted: IsSorted) -&gt; Series {
         NullChunked::new(<span class="self">self</span>.name.clone(), by.len()).into_series()
@@ -303,22 +302,13 @@
     }
 
     <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, index: usize) -&gt; PolarsResult&lt;AnyValue&gt; {
-        <span class="kw">if </span>index &lt; <span class="self">self</span>.len() {
-            <span class="prelude-val">Ok</span>(AnyValue::Null)
-        } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                <span class="macro">format!</span>(
-                    <span class="string">&quot;index {index} is out of bounds on series of length {}&quot;</span>,
-                    <span class="self">self</span>.len()
-                )
-                .into(),
-            ))
-        }
+        <span class="macro">polars_ensure!</span>(index &lt; <span class="self">self</span>.len(), oob = index, <span class="self">self</span>.len());
+        <span class="prelude-val">Ok</span>(AnyValue::Null)
     }
 
     <span class="kw">fn </span>slice(<span class="kw-2">&amp;</span><span class="self">self</span>, offset: i64, length: usize) -&gt; Series {
-        <span class="kw">let </span>(offset, length) = slice_offsets(offset, length, <span class="self">self</span>.len());
-        NullChunked::new(<span class="self">self</span>.name.clone(), length - offset).into_series()
+        <span class="kw">let </span>(<span class="kw">_</span>, length) = slice_offsets(offset, length, <span class="self">self</span>.len());
+        NullChunked::new(<span class="self">self</span>.name.clone(), length).into_series()
     }
 
     <span class="kw">fn </span>is_null(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; BooleanChunked {

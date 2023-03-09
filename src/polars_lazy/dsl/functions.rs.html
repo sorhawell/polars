@@ -184,7 +184,7 @@
     <span class="kw">let </span>lf = std::mem::take(
         inputs
             .get_mut(<span class="number">0</span>)
-            .ok_or_else(|| PolarsError::ComputeError(<span class="string">&quot;empty container given&quot;</span>.into()))<span class="question-mark">?</span>,
+            .ok_or_else(|| <span class="macro">polars_err!</span>(NoData: <span class="string">&quot;empty container given&quot;</span>))<span class="question-mark">?</span>,
     );
     <span class="kw">let </span><span class="kw-2">mut </span>opt_state = lf.opt_state;
     <span class="kw">let </span><span class="kw-2">mut </span>lps = Vec::with_capacity(inputs.len());

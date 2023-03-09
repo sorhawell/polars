@@ -455,8 +455,9 @@
 <a href="#455" id="455">455</a>
 </pre><pre class="rust"><code><span class="kw">use </span>arrow::offset::OffsetsBuffer;
 <span class="kw">use </span>polars_arrow::kernels::concatenate::concatenate_owned_unchecked;
-<span class="attr">#[cfg(feature = <span class="string">&quot;serde&quot;</span>)]
+<span class="attr">#[cfg(feature = <span class="string">&quot;serde-lazy&quot;</span>)]
 </span><span class="kw">use </span>serde::{Deserialize, Serialize};
+<span class="kw">use </span>smartstring::alias::String <span class="kw">as </span>SmartString;
 
 <span class="kw">use </span><span class="kw">crate</span>::chunked_array::ops::explode::offsets_to_indexes;
 <span class="kw">use </span><span class="kw">crate</span>::prelude::<span class="kw-2">*</span>;
@@ -467,20 +468,22 @@
     <span class="kw">match </span>series.dtype() {
         DataType::List(<span class="kw">_</span>) =&gt; series.list().unwrap().explode_and_offsets(),
         DataType::Utf8 =&gt; series.utf8().unwrap().explode_and_offsets(),
-        <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(PolarsError::InvalidOperation(
-            <span class="macro">format!</span>(<span class="string">&quot;cannot explode dtype: {:?}&quot;</span>, series.dtype()).into(),
-        )),
+        <span class="kw">_ </span>=&gt; <span class="macro">polars_bail!</span>(opq = explode, series.dtype()),
     }
 }
 
 <span class="doccomment">/// Arguments for `[DataFrame::melt]` function
-</span><span class="attr">#[derive(Clone, Default, Debug)]
-#[cfg_attr(feature = <span class="string">&quot;serde&quot;</span>, derive(Serialize, Deserialize))]
+</span><span class="attr">#[derive(Clone, Default, Debug, PartialEq)]
+#[cfg_attr(feature = <span class="string">&quot;serde-lazy&quot;</span>, derive(Serialize, Deserialize))]
 </span><span class="kw">pub struct </span>MeltArgs {
-    <span class="kw">pub </span>id_vars: Vec&lt;String&gt;,
-    <span class="kw">pub </span>value_vars: Vec&lt;String&gt;,
-    <span class="kw">pub </span>variable_name: <span class="prelude-ty">Option</span>&lt;String&gt;,
-    <span class="kw">pub </span>value_name: <span class="prelude-ty">Option</span>&lt;String&gt;,
+    <span class="kw">pub </span>id_vars: Vec&lt;SmartString&gt;,
+    <span class="kw">pub </span>value_vars: Vec&lt;SmartString&gt;,
+    <span class="kw">pub </span>variable_name: <span class="prelude-ty">Option</span>&lt;SmartString&gt;,
+    <span class="kw">pub </span>value_name: <span class="prelude-ty">Option</span>&lt;SmartString&gt;,
+    <span class="doccomment">/// Whether the melt may be done
+    /// in the streaming engine
+    /// This will not have a stable ordering
+    </span><span class="kw">pub </span>streamable: bool,
 }
 
 <span class="kw">impl </span>DataFrame {
@@ -523,14 +526,13 @@
                 <span class="kw">if </span>exploded.len() == df.height() || df.width() == <span class="number">0 </span>{
                     df.columns.insert(col_idx, exploded);
                 } <span class="kw">else </span>{
-                    <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ShapeMisMatch(
-                        <span class="macro">format!</span>(<span class="string">&quot;The exploded column(s) don&#39;t have the same length. Length DataFrame: {}. Length exploded column {}: {}&quot;</span>, df.height(), exploded.name(), exploded.len()).into(),
-                    ));
+                    <span class="macro">polars_bail!</span>(
+                        ShapeMismatch: <span class="string">&quot;exploded column(s) {:?} doesn&#39;t have the same length: {} \
+                        as the dataframe: {}&quot;</span>, exploded.name(), exploded.name(), df.height(),
+                    );
                 }
             } <span class="kw">else </span>{
-                <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::InvalidOperation(
-                    <span class="macro">format!</span>(<span class="string">&quot;cannot explode dtype: {:?}&quot;</span>, s.dtype()).into(),
-                ));
+                <span class="macro">polars_bail!</span>(opq = explode, s.dtype());
             }
         }
         <span class="prelude-val">Ok</span>(df)
@@ -664,8 +666,8 @@
     /// ```
     </span><span class="kw">pub fn </span>melt&lt;I, J&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, id_vars: I, value_vars: J) -&gt; PolarsResult&lt;<span class="self">Self</span>&gt;
     <span class="kw">where
-        </span>I: IntoVec&lt;String&gt;,
-        J: IntoVec&lt;String&gt;,
+        </span>I: IntoVec&lt;SmartString&gt;,
+        J: IntoVec&lt;SmartString&gt;,
     {
         <span class="kw">let </span>id_vars = id_vars.into_vec();
         <span class="kw">let </span>value_vars = value_vars.into_vec();
@@ -697,7 +699,7 @@
                     <span class="kw">if </span>id_vars_set.contains(s.name()) {
                         <span class="prelude-val">None
                     </span>} <span class="kw">else </span>{
-                        <span class="prelude-val">Some</span>(s.name().to_string())
+                        <span class="prelude-val">Some</span>(s.name().into())
                     }
                 })
                 .collect();
@@ -708,7 +710,7 @@
         <span class="kw">let </span><span class="kw-2">mut </span>iter = value_vars.iter().map(|v| {
             schema
                 .get(v)
-                .ok_or_else(|| PolarsError::ColumnNotFound(v.to_string().into()))
+                .ok_or_else(|| <span class="macro">polars_err!</span>(ColumnNotFound: <span class="string">&quot;{}&quot;</span>, v))
         });
         <span class="kw">let </span><span class="kw-2">mut </span>st = iter.next().unwrap()<span class="question-mark">?</span>.clone();
         <span class="kw">for </span>dt <span class="kw">in </span>iter {
@@ -809,7 +811,7 @@
     </span><span class="kw">fn </span>test_explode_df_empty_list() -&gt; PolarsResult&lt;()&gt; {
         <span class="kw">let </span>s0 = Series::new(<span class="string">&quot;a&quot;</span>, <span class="kw-2">&amp;</span>[<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>]);
         <span class="kw">let </span>s1 = Series::new(<span class="string">&quot;b&quot;</span>, <span class="kw-2">&amp;</span>[<span class="number">1</span>, <span class="number">1</span>, <span class="number">1</span>]);
-        <span class="kw">let </span>list = Series::new(<span class="string">&quot;foo&quot;</span>, <span class="kw-2">&amp;</span>[s0, s1.clone(), s1.slice(<span class="number">0</span>, <span class="number">0</span>)]);
+        <span class="kw">let </span>list = Series::new(<span class="string">&quot;foo&quot;</span>, <span class="kw-2">&amp;</span>[s0, s1.clone(), s1.clear()]);
         <span class="kw">let </span>s0 = Series::new(<span class="string">&quot;B&quot;</span>, [<span class="number">1</span>, <span class="number">2</span>, <span class="number">3</span>]);
         <span class="kw">let </span>s1 = Series::new(<span class="string">&quot;C&quot;</span>, [<span class="number">1</span>, <span class="number">1</span>, <span class="number">1</span>]);
         <span class="kw">let </span>df = DataFrame::new(<span class="macro">vec!</span>[list, s0.clone(), s1.clone()])<span class="question-mark">?</span>;
@@ -823,7 +825,7 @@
 
         <span class="macro">assert!</span>(out.frame_equal_missing(<span class="kw-2">&amp;</span>expected));
 
-        <span class="kw">let </span>list = Series::new(<span class="string">&quot;foo&quot;</span>, <span class="kw-2">&amp;</span>[s0.clone(), s1.slice(<span class="number">0</span>, <span class="number">0</span>), s1.clone()]);
+        <span class="kw">let </span>list = Series::new(<span class="string">&quot;foo&quot;</span>, <span class="kw-2">&amp;</span>[s0.clone(), s1.clear(), s1.clone()]);
         <span class="kw">let </span>df = DataFrame::new(<span class="macro">vec!</span>[list, s0.clone(), s1.clone()])<span class="question-mark">?</span>;
         <span class="kw">let </span>out = df.explode([<span class="string">&quot;foo&quot;</span>])<span class="question-mark">?</span>;
         <span class="kw">let </span>expected = <span class="macro">df!</span>[
@@ -874,8 +876,7 @@
         <span class="kw">let </span>args = MeltArgs {
             id_vars: <span class="macro">vec!</span>[],
             value_vars: <span class="macro">vec!</span>[],
-            variable_name: <span class="prelude-val">None</span>,
-            value_name: <span class="prelude-val">None</span>,
+            ..Default::default()
         };
 
         <span class="kw">let </span>melted = df.melt2(args).unwrap();
@@ -891,8 +892,7 @@
         <span class="kw">let </span>args = MeltArgs {
             id_vars: <span class="macro">vec!</span>[<span class="string">&quot;A&quot;</span>.into()],
             value_vars: <span class="macro">vec!</span>[],
-            variable_name: <span class="prelude-val">None</span>,
-            value_name: <span class="prelude-val">None</span>,
+            ..Default::default()
         };
 
         <span class="kw">let </span>melted = df.melt2(args).unwrap();

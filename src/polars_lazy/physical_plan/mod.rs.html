@@ -14,11 +14,7 @@
 <a href="#14" id="14">14</a>
 <a href="#15" id="15">15</a>
 <a href="#16" id="16">16</a>
-<a href="#17" id="17">17</a>
-<a href="#18" id="18">18</a>
-<a href="#19" id="19">19</a>
-</pre><pre class="rust"><code><span class="kw">mod </span>errors;
-<span class="kw">pub mod </span>executors;
+</pre><pre class="rust"><code><span class="kw">pub mod </span>executors;
 <span class="attr">#[cfg(any(feature = <span class="string">&quot;list_eval&quot;</span>, feature = <span class="string">&quot;pivot&quot;</span>))]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>exotic;
 <span class="kw">pub mod </span>expressions;
@@ -30,9 +26,7 @@
 <span class="attr">#[cfg(feature = <span class="string">&quot;streaming&quot;</span>)]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>streaming;
 
-<span class="kw">use </span>errors::expression_err;
 <span class="kw">use </span>polars_core::prelude::<span class="kw-2">*</span>;
-<span class="kw">use </span>polars_io::predicates::PhysicalIoExpr;
 
 <span class="kw">use </span><span class="kw">crate</span>::physical_plan::state::ExecutionState;
 <span class="kw">use </span><span class="kw">crate</span>::prelude::<span class="kw-2">*</span>;

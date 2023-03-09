@@ -1201,6 +1201,7 @@
 <a href="#1201" id="1201">1201</a>
 <a href="#1202" id="1202">1202</a>
 <a href="#1203" id="1203">1203</a>
+<a href="#1204" id="1204">1204</a>
 </pre><pre class="rust"><code><span class="kw">mod </span>agg_list;
 <span class="kw">mod </span>dispatch;
 
@@ -1208,7 +1209,8 @@
 <span class="kw">use </span>arrow::bitmap::{Bitmap, MutableBitmap};
 <span class="kw">use </span>arrow::types::simd::Simd;
 <span class="kw">use </span>arrow::types::NativeType;
-<span class="kw">use </span>num::{Bounded, Num, NumCast, ToPrimitive, Zero};
+<span class="kw">use </span>num_traits::pow::Pow;
+<span class="kw">use </span>num_traits::{Bounded, Num, NumCast, ToPrimitive, Zero};
 <span class="kw">use </span>polars_arrow::data_types::IsFloat;
 <span class="kw">use </span>polars_arrow::kernels::rolling;
 <span class="kw">use </span>polars_arrow::kernels::rolling::no_nulls::{
@@ -2032,7 +2034,7 @@
         + VarAggSeries
         + ChunkQuantile&lt;T::Native&gt;
         + QuantileAggSeries,
-    T::Native: Simd + NumericNative + num::pow::Pow&lt;T::Native, Output = T::Native&gt;,
+    T::Native: Simd + NumericNative + Pow&lt;T::Native, Output = T::Native&gt;,
     &lt;T::Native <span class="kw">as </span>Simd&gt;::Simd: std::ops::Add&lt;Output = &lt;T::Native <span class="kw">as </span>Simd&gt;::Simd&gt;
         + arrow::compute::aggregate::Sum&lt;T::Native&gt;
         + arrow::compute::aggregate::SimdOrd&lt;T::Native&gt;,

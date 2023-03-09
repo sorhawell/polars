@@ -144,7 +144,7 @@
 </span><span class="kw">pub enum </span>ReaderBytes&lt;<span class="lifetime">&#39;a</span>&gt; {
     Borrowed(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>[u8]),
     Owned(Vec&lt;u8&gt;),
-    Mapped(memmap::Mmap),
+    Mapped(memmap::Mmap, <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>File),
 }
 
 <span class="kw">impl </span>std::ops::Deref <span class="kw">for </span>ReaderBytes&lt;<span class="lifetime">&#39;_</span>&gt; {
@@ -153,7 +153,7 @@
         <span class="kw">match </span><span class="self">self </span>{
             <span class="self">Self</span>::Borrowed(ref_bytes) =&gt; ref_bytes,
             <span class="self">Self</span>::Owned(vec) =&gt; vec,
-            <span class="self">Self</span>::Mapped(mmap) =&gt; mmap,
+            <span class="self">Self</span>::Mapped(mmap, <span class="kw">_</span>) =&gt; mmap,
         }
     }
 }
@@ -165,7 +165,7 @@
             <span class="prelude-val">None </span>=&gt; {
                 <span class="kw">let </span>f = m.to_file().unwrap();
                 <span class="kw">let </span>mmap = <span class="kw">unsafe </span>{ memmap::Mmap::map(f).unwrap() };
-                ReaderBytes::Mapped(mmap)
+                ReaderBytes::Mapped(mmap, f)
             }
         }
     }

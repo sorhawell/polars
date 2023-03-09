@@ -373,14 +373,6 @@
 <a href="#373" id="373">373</a>
 <a href="#374" id="374">374</a>
 <a href="#375" id="375">375</a>
-<a href="#376" id="376">376</a>
-<a href="#377" id="377">377</a>
-<a href="#378" id="378">378</a>
-<a href="#379" id="379">379</a>
-<a href="#380" id="380">380</a>
-<a href="#381" id="381">381</a>
-<a href="#382" id="382">382</a>
-<a href="#383" id="383">383</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::fmt::Write;
 
 <span class="attr">#[cfg(feature = <span class="string">&quot;timezones&quot;</span>)]
@@ -409,9 +401,7 @@
         <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Ok</span>(()),
         <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="kw">match </span>tz.parse::&lt;Tz&gt;() {
             <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Ok</span>(()),
-            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                <span class="macro">format!</span>(<span class="string">&quot;Could not parse timezone: &#39;{tz}&#39;&quot;</span>).into(),
-            )),
+            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="macro">polars_bail!</span>(ComputeError: <span class="string">&quot;unable to parse timezone: &#39;{}&#39;&quot;</span>, tz),
         },
     }
 }
@@ -531,12 +521,12 @@
                 <span class="kw">let </span>chunks = <span class="self">self
                     </span>.downcast_iter()
                     .map(|arr| {
-                        <span class="prelude-val">Ok</span>(replace_timezone(
+                        replace_timezone(
                             arr,
                             <span class="self">self</span>.time_unit().to_arrow(),
                             to.to_string(),
                             from.to_string(),
-                        )<span class="question-mark">?</span>)
+                        )
                     })
                     .collect::&lt;PolarsResult&lt;<span class="kw">_</span>&gt;&gt;()<span class="question-mark">?</span>;
                 <span class="kw">let </span>out = <span class="kw">unsafe </span>{ ChunkedArray::from_chunks(<span class="self">self</span>.name(), chunks) };
@@ -546,12 +536,12 @@
                 <span class="kw">let </span>chunks = <span class="self">self
                     </span>.downcast_iter()
                     .map(|arr| {
-                        <span class="prelude-val">Ok</span>(replace_timezone(
+                        replace_timezone(
                             arr,
                             <span class="self">self</span>.time_unit().to_arrow(),
                             <span class="string">&quot;UTC&quot;</span>.to_string(),
                             from.to_string(),
-                        )<span class="question-mark">?</span>)
+                        )
                     })
                     .collect::&lt;PolarsResult&lt;<span class="kw">_</span>&gt;&gt;()<span class="question-mark">?</span>;
                 <span class="kw">let </span>out = <span class="kw">unsafe </span>{ ChunkedArray::from_chunks(<span class="self">self</span>.name(), chunks) };
@@ -561,12 +551,12 @@
                 <span class="kw">let </span>chunks = <span class="self">self
                     </span>.downcast_iter()
                     .map(|arr| {
-                        <span class="prelude-val">Ok</span>(replace_timezone(
+                        replace_timezone(
                             arr,
                             <span class="self">self</span>.time_unit().to_arrow(),
                             to.to_string(),
                             <span class="string">&quot;UTC&quot;</span>.to_string(),
-                        )<span class="question-mark">?</span>)
+                        )
                     })
                     .collect::&lt;PolarsResult&lt;<span class="kw">_</span>&gt;&gt;()<span class="question-mark">?</span>;
                 <span class="kw">let </span>out = <span class="kw">unsafe </span>{ ChunkedArray::from_chunks(<span class="self">self</span>.name(), chunks) };
@@ -598,16 +588,12 @@
                 <span class="string">&quot;{}&quot;</span>,
                 Utc.from_local_datetime(<span class="kw-2">&amp;</span>dt).earliest().unwrap().format(fmt)
             )
-            .map_err(|<span class="kw">_</span>| {
-                PolarsError::ComputeError(
-                    <span class="macro">format!</span>(<span class="string">&quot;Cannot format DateTime with format &#39;{fmt}&#39;.&quot;</span>).into(),
-                )
-            })<span class="question-mark">?</span>,
-            <span class="kw">_ </span>=&gt; <span class="macro">write!</span>(fmted, <span class="string">&quot;{}&quot;</span>, dt.format(fmt)).map_err(|<span class="kw">_</span>| {
-                PolarsError::ComputeError(
-                    <span class="macro">format!</span>(<span class="string">&quot;Cannot format NaiveDateTime with format &#39;{fmt}&#39;.&quot;</span>).into(),
-                )
-            })<span class="question-mark">?</span>,
+            .map_err(
+                |<span class="kw">_</span>| <span class="macro">polars_err!</span>(ComputeError: <span class="string">&quot;cannot format DateTime with format &#39;{}&#39;&quot;</span>, fmt),
+            )<span class="question-mark">?</span>,
+            <span class="kw">_ </span>=&gt; <span class="macro">write!</span>(fmted, <span class="string">&quot;{}&quot;</span>, dt.format(fmt)).map_err(
+                |<span class="kw">_</span>| <span class="macro">polars_err!</span>(ComputeError: <span class="string">&quot;cannot format NaiveDateTime with format &#39;{}&#39;&quot;</span>, fmt),
+            )<span class="question-mark">?</span>,
         };
         <span class="kw">let </span>fmted = fmted; <span class="comment">// discard mut
 
@@ -718,16 +704,14 @@
     }
     <span class="attr">#[cfg(feature = <span class="string">&quot;timezones&quot;</span>)]
     </span><span class="kw">pub fn </span>convert_time_zone(<span class="kw-2">mut </span><span class="self">self</span>, time_zone: TimeZone) -&gt; PolarsResult&lt;<span class="self">Self</span>&gt; {
-        <span class="kw">match </span><span class="self">self</span>.time_zone() {
-            <span class="prelude-val">Some</span>(<span class="kw">_</span>) =&gt; {
-                <span class="self">self</span>.set_time_zone(time_zone)<span class="question-mark">?</span>;
-                <span class="prelude-val">Ok</span>(<span class="self">self</span>)
-            }
-            <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                <span class="string">&quot;Cannot call convert_time_zone on tz-naive. Set a time zone first with replace_time_zone&quot;
-                    </span>.into(),
-            )),
-        }
+        <span class="macro">polars_ensure!</span>(
+            <span class="self">self</span>.time_zone().is_some(),
+            InvalidOperation:
+            <span class="string">&quot;cannot call `convert_time_zone` on tz-naive; \
+            set a time zone first with `replace_time_zone`&quot;
+        </span>);
+        <span class="self">self</span>.set_time_zone(time_zone)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(<span class="self">self</span>)
     }
 }
 

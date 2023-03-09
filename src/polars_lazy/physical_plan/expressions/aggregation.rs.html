@@ -558,15 +558,6 @@
 <a href="#558" id="558">558</a>
 <a href="#559" id="559">559</a>
 <a href="#560" id="560">560</a>
-<a href="#561" id="561">561</a>
-<a href="#562" id="562">562</a>
-<a href="#563" id="563">563</a>
-<a href="#564" id="564">564</a>
-<a href="#565" id="565">565</a>
-<a href="#566" id="566">566</a>
-<a href="#567" id="567">567</a>
-<a href="#568" id="568">568</a>
-<a href="#569" id="569">569</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::borrow::Cow;
 <span class="kw">use </span>std::sync::Arc;
 
@@ -619,17 +610,11 @@
         </span><span class="kw">let </span>keep_name = ac.series().name().to_string();
 
         <span class="kw">let </span>check_flat = || {
-            <span class="kw">if </span>!ac.null_propagated &amp;&amp; <span class="macro">matches!</span>(ac.agg_state(), AggState::AggregatedFlat(<span class="kw">_</span>)) {
-                <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                    <span class="macro">format!</span>(
-                        <span class="string">&quot;Cannot aggregate as {}. The column is already aggregated.&quot;</span>,
-                        <span class="self">self</span>.agg_type
-                    )
-                    .into(),
-                ))
-            } <span class="kw">else </span>{
-                <span class="prelude-val">Ok</span>(())
-            }
+            <span class="macro">polars_ensure!</span>(
+                ac.null_propagated || !<span class="macro">matches!</span>(ac.agg_state(), AggState::AggregatedFlat(<span class="kw">_</span>)),
+                ComputeError: <span class="string">&quot;cannot aggregate as {}, the column is already aggregated&quot;
+            </span>);
+            <span class="prelude-val">Ok</span>(())
         };
 
         <span class="comment">// Safety:
@@ -1067,14 +1052,11 @@
 
     <span class="kw">fn </span>get_quantile(<span class="kw-2">&amp;</span><span class="self">self</span>, df: <span class="kw-2">&amp;</span>DataFrame, state: <span class="kw-2">&amp;</span>ExecutionState) -&gt; PolarsResult&lt;f64&gt; {
         <span class="kw">let </span>quantile = <span class="self">self</span>.quantile.evaluate(df, state)<span class="question-mark">?</span>;
-        <span class="kw">if </span>quantile.len() &gt; <span class="number">1 </span>{
-            <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                <span class="string">&quot;Polars only supports computing a single quantile. \
-            Make sure the &#39;quantile&#39; expression input produces a single quantile.&quot;
-                    </span>.into(),
-            ));
-        }
-        quantile.get(<span class="number">0</span>).unwrap().try_extract::&lt;f64&gt;()
+        <span class="macro">polars_ensure!</span>(quantile.len() &lt;= <span class="number">1</span>, ComputeError:
+            <span class="string">&quot;polars only supports computing a single quantile; \
+            make sure the &#39;quantile&#39; expression input produces a single quantile&quot;
+        </span>);
+        quantile.get(<span class="number">0</span>).unwrap().try_extract()
     }
 }
 

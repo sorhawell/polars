@@ -122,15 +122,6 @@
 <a href="#122" id="122">122</a>
 <a href="#123" id="123">123</a>
 <a href="#124" id="124">124</a>
-<a href="#125" id="125">125</a>
-<a href="#126" id="126">126</a>
-<a href="#127" id="127">127</a>
-<a href="#128" id="128">128</a>
-<a href="#129" id="129">129</a>
-<a href="#130" id="130">130</a>
-<a href="#131" id="131">131</a>
-<a href="#132" id="132">132</a>
-<a href="#133" id="133">133</a>
 </pre><pre class="rust"><code><span class="attr">#[cfg(feature = <span class="string">&quot;dynamic_groupby&quot;</span>)]
 </span><span class="kw">use </span>polars_time::RollingGroupOptions;
 
@@ -200,21 +191,12 @@
             }
         };
 
-        <span class="comment">// a rolling groupby has overlapping windows
-        </span>state.set_has_overlapping_groups();
-
         <span class="kw">let </span>agg_columns = POOL.install(|| {
             <span class="self">self</span>.aggs
                 .par_iter()
                 .map(|expr| {
                     <span class="kw">let </span>agg = expr.evaluate_on_groups(<span class="kw-2">&amp;</span>df, groups, state)<span class="question-mark">?</span>.aggregated();
-                    <span class="kw">if </span>agg.len() != groups.len() {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                            <span class="macro">format!</span>(<span class="string">&quot;returned aggregation is a different length: {} than the group lengths: {}&quot;</span>,
-                                    agg.len(),
-                                    groups.len()).into()
-                        ))
-                    }
+                    <span class="macro">polars_ensure!</span>(agg.len() == groups.len(), agg_len = agg.len(), groups.len());
                     <span class="prelude-val">Ok</span>(agg)
                 })
                 .collect::&lt;PolarsResult&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;&gt;()
@@ -250,7 +232,7 @@
                 .iter()
                 .map(|s| <span class="prelude-val">Ok</span>(s.to_field(<span class="kw-2">&amp;</span><span class="self">self</span>.input_schema)<span class="question-mark">?</span>.name))
                 .collect::&lt;PolarsResult&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;&gt;()<span class="question-mark">?</span>;
-            <span class="kw">let </span>name = column_delimited(<span class="string">&quot;groupby_rolling&quot;</span>.to_string(), <span class="kw-2">&amp;</span>by);
+            <span class="kw">let </span>name = comma_delimited(<span class="string">&quot;groupby_rolling&quot;</span>.to_string(), <span class="kw-2">&amp;</span>by);
             Cow::Owned(name)
         } <span class="kw">else </span>{
             Cow::Borrowed(<span class="string">&quot;&quot;</span>)

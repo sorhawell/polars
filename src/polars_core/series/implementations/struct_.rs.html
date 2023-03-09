@@ -504,11 +504,11 @@
         } <span class="kw">else </span>{
             <span class="kw">let </span>offset = <span class="self">self</span>.chunks().len();
             <span class="kw">for </span>(lhs, rhs) <span class="kw">in </span><span class="self">self</span>.<span class="number">0</span>.fields_mut().iter_mut().zip(other.fields()) {
-                <span class="kw">let </span>lhs_name = lhs.name();
-                <span class="kw">let </span>rhs_name = rhs.name();
-                <span class="kw">if </span>lhs_name != rhs_name {
-                    <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::SchemaMisMatch(<span class="macro">format!</span>(<span class="string">&quot;cannot append field with name: {rhs_name} to struct with field name: {lhs_name}, please check your schema&quot;</span>).into()));
-                }
+                <span class="macro">polars_ensure!</span>(
+                    lhs.name() == rhs.name(), SchemaMismatch:
+                    <span class="string">&quot;cannot append field with name {:?} to struct with field name {:?}&quot;</span>,
+                    rhs.name(), lhs.name(),
+                );
                 lhs.append(rhs)<span class="question-mark">?</span>;
             }
             <span class="self">self</span>.<span class="number">0</span>.update_chunks(offset);
@@ -525,11 +525,11 @@
             <span class="prelude-val">Ok</span>(())
         } <span class="kw">else </span>{
             <span class="kw">for </span>(lhs, rhs) <span class="kw">in </span><span class="self">self</span>.<span class="number">0</span>.fields_mut().iter_mut().zip(other.fields()) {
-                <span class="kw">let </span>lhs_name = lhs.name();
-                <span class="kw">let </span>rhs_name = rhs.name();
-                <span class="kw">if </span>lhs_name != rhs_name {
-                    <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::SchemaMisMatch(<span class="macro">format!</span>(<span class="string">&quot;cannot extend field with name: {rhs_name} to struct with field name: {lhs_name}, please check your schema&quot;</span>).into()));
-                }
+                <span class="macro">polars_ensure!</span>(
+                    lhs.name() == rhs.name(), SchemaMismatch:
+                    <span class="string">&quot;cannot extend field with name {:?} to struct with field name {:?}&quot;</span>,
+                    rhs.name(), lhs.name(),
+                );
                 lhs.extend(rhs)<span class="question-mark">?</span>;
             }
             <span class="self">self</span>.<span class="number">0</span>.update_chunks(<span class="number">0</span>);

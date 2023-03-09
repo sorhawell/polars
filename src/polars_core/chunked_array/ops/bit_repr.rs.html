@@ -319,6 +319,8 @@
 <a href="#319" id="319">319</a>
 <a href="#320" id="320">320</a>
 <a href="#321" id="321">321</a>
+<a href="#322" id="322">322</a>
+<a href="#323" id="323">323</a>
 </pre><pre class="rust"><code><span class="kw">use </span>arrow::buffer::Buffer;
 
 <span class="kw">use </span><span class="kw">crate</span>::prelude::<span class="kw-2">*</span>;
@@ -459,11 +461,13 @@
                 .collect::&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;();
             <span class="kw">unsafe </span>{ UInt32Chunked::from_chunks(<span class="self">self</span>.name(), chunks) }
         } <span class="kw">else </span>{
-            <span class="self">self</span>.cast_unchecked(<span class="kw-2">&amp;</span>DataType::UInt32)
-                .unwrap()
-                .u32()
-                .unwrap()
-                .clone()
+            <span class="kw">unsafe </span>{
+                <span class="self">self</span>.cast_unchecked(<span class="kw-2">&amp;</span>DataType::UInt32)
+                    .unwrap()
+                    .u32()
+                    .unwrap()
+                    .clone()
+            }
         }
     }
 }

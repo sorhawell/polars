@@ -992,6 +992,17 @@
 <a href="#992" id="992">992</a>
 <a href="#993" id="993">993</a>
 <a href="#994" id="994">994</a>
+<a href="#995" id="995">995</a>
+<a href="#996" id="996">996</a>
+<a href="#997" id="997">997</a>
+<a href="#998" id="998">998</a>
+<a href="#999" id="999">999</a>
+<a href="#1000" id="1000">1000</a>
+<a href="#1001" id="1001">1001</a>
+<a href="#1002" id="1002">1002</a>
+<a href="#1003" id="1003">1003</a>
+<a href="#1004" id="1004">1004</a>
+<a href="#1005" id="1005">1005</a>
 </pre><pre class="rust"><code><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">mod </span>series;
 <span class="kw">mod </span>supertype;
 
@@ -999,9 +1010,11 @@
 <span class="kw">use </span>std::ops::{Deref, DerefMut};
 
 <span class="kw">use </span>arrow::bitmap::Bitmap;
+<span class="kw">use </span>num_traits::{One, Zero};
 <span class="kw">pub use </span>polars_arrow::utils::{TrustMyLength, <span class="kw-2">*</span>};
 <span class="kw">use </span>rayon::prelude::<span class="kw-2">*</span>;
 <span class="kw">pub use </span>series::<span class="kw-2">*</span>;
+<span class="kw">use </span>smartstring::alias::String <span class="kw">as </span>SmartString;
 <span class="kw">pub use </span>supertype::<span class="kw-2">*</span>;
 <span class="kw">pub use </span>{arrow, rayon};
 
@@ -1276,8 +1289,7 @@
     (<span class="macro-nonterminal">$obj</span>:expr, <span class="macro-nonterminal">$</span><span class="kw">macro</span>:<span class="macro-nonterminal">ident</span>, <span class="macro-nonterminal">$macro_utf8</span>:ident, <span class="macro-nonterminal">$macro_binary</span>:ident, <span class="macro-nonterminal">$macro_bool</span>:ident $(, <span class="macro-nonterminal">$opt_args</span>:expr)<span class="kw-2">*</span>) =&gt; {{
         <span class="kw">match </span><span class="macro-nonterminal">$obj </span>{
             DataType::Utf8 =&gt; <span class="macro-nonterminal">$</span><span class="macro">macro_utf8!</span>($(<span class="macro-nonterminal">$opt_args</span>)<span class="kw-2">*</span>),
-            <span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-            </span>DataType::Binary =&gt; <span class="macro-nonterminal">$</span><span class="macro">macro_binary!</span>($(<span class="macro-nonterminal">$opt_args</span>)<span class="kw-2">*</span>),
+            DataType::Binary =&gt; <span class="macro-nonterminal">$</span><span class="macro">macro_binary!</span>($(<span class="macro-nonterminal">$opt_args</span>)<span class="kw-2">*</span>),
             DataType::Boolean =&gt; <span class="macro-nonterminal">$</span><span class="macro">macro_bool!</span>($(<span class="macro-nonterminal">$opt_args</span>)<span class="kw-2">*</span>),
             <span class="attr">#[cfg(feature = <span class="string">&quot;dtype-u8&quot;</span>)]
             </span>DataType::UInt8 =&gt; <span class="macro-nonterminal">$</span><span class="macro">macro!</span>(<span class="macro-nonterminal">UInt8Type </span>$(, <span class="macro-nonterminal">$opt_args</span>)<span class="kw-2">*</span>),
@@ -1818,6 +1830,16 @@
     }
 }
 
+<span class="kw">impl</span>&lt;I, S&gt; IntoVec&lt;SmartString&gt; <span class="kw">for </span>I
+<span class="kw">where
+    </span>I: IntoIterator&lt;Item = S&gt;,
+    S: AsRef&lt;str&gt;,
+{
+    <span class="kw">fn </span>into_vec(<span class="self">self</span>) -&gt; Vec&lt;SmartString&gt; {
+        <span class="self">self</span>.into_iter().map(|s| s.as_ref().into()).collect()
+    }
+}
+
 <span class="doccomment">/// This logic is same as the impl on ChunkedArray
 /// The difference is that there is less indirection because the caller should preallocate
 /// `chunk_lens` once. On the `ChunkedArray` we indirect through an `ArrayRef` which is an indirection
@@ -1825,20 +1847,20 @@
 </span><span class="attr">#[inline]
 </span><span class="kw">pub</span>(<span class="kw">crate</span>) <span class="kw">fn </span>index_to_chunked_index&lt;
     I: Iterator&lt;Item = Idx&gt;,
-    Idx: PartialOrd + std::ops::AddAssign + std::ops::SubAssign + num::Zero + num::One,
+    Idx: PartialOrd + std::ops::AddAssign + std::ops::SubAssign + Zero + One,
 &gt;(
     chunk_lens: I,
     index: Idx,
 ) -&gt; (Idx, Idx) {
     <span class="kw">let </span><span class="kw-2">mut </span>index_remainder = index;
-    <span class="kw">let </span><span class="kw-2">mut </span>current_chunk_idx = num::Zero::zero();
+    <span class="kw">let </span><span class="kw-2">mut </span>current_chunk_idx = Zero::zero();
 
     <span class="kw">for </span>chunk_len <span class="kw">in </span>chunk_lens {
         <span class="kw">if </span>chunk_len &gt; index_remainder {
             <span class="kw">break</span>;
         } <span class="kw">else </span>{
             index_remainder -= chunk_len;
-            current_chunk_idx += num::One::one();
+            current_chunk_idx += One::one();
         }
     }
     (current_chunk_idx, index_remainder)

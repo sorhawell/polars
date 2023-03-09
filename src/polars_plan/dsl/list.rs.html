@@ -300,12 +300,6 @@
 <a href="#300" id="300">300</a>
 <a href="#301" id="301">301</a>
 <a href="#302" id="302">302</a>
-<a href="#303" id="303">303</a>
-<a href="#304" id="304">304</a>
-<a href="#305" id="305">305</a>
-<a href="#306" id="306">306</a>
-<a href="#307" id="307">307</a>
-<a href="#308" id="308">308</a>
 </pre><pre class="rust"><code><span class="attr">#[cfg(feature = <span class="string">&quot;list_to_struct&quot;</span>)]
 </span><span class="kw">use </span>std::sync::RwLock;
 
@@ -415,12 +409,8 @@
 
     <span class="doccomment">/// Get items in every sublist by index.
     </span><span class="kw">pub fn </span>get(<span class="self">self</span>, index: Expr) -&gt; Expr {
-        <span class="self">self</span>.<span class="number">0</span>.apply_many_private(
-            FunctionExpr::ListExpr(ListFunction::Get),
-            <span class="kw-2">&amp;</span>[index],
-            <span class="bool-val">false</span>,
-            <span class="bool-val">false</span>,
-        )
+        <span class="self">self</span>.<span class="number">0
+            </span>.map_many_private(FunctionExpr::ListExpr(ListFunction::Get), <span class="kw-2">&amp;</span>[index], <span class="bool-val">false</span>)
     }
 
     <span class="doccomment">/// Get items in every sublist by multiple indexes.
@@ -430,10 +420,9 @@
     /// This behavior is more expensive than defaulting to returing an `Error`.
     </span><span class="attr">#[cfg(feature = <span class="string">&quot;list_take&quot;</span>)]
     </span><span class="kw">pub fn </span>take(<span class="self">self</span>, index: Expr, null_on_oob: bool) -&gt; Expr {
-        <span class="self">self</span>.<span class="number">0</span>.apply_many_private(
+        <span class="self">self</span>.<span class="number">0</span>.map_many_private(
             FunctionExpr::ListExpr(ListFunction::Take(null_on_oob)),
             <span class="kw-2">&amp;</span>[index],
-            <span class="bool-val">false</span>,
             <span class="bool-val">false</span>,
         )
     }
@@ -454,7 +443,7 @@
     </span><span class="kw">pub fn </span>join(<span class="self">self</span>, separator: <span class="kw-2">&amp;</span>str) -&gt; Expr {
         <span class="kw">let </span>separator = separator.to_string();
         <span class="self">self</span>.<span class="number">0
-            </span>.apply(
+            </span>.map(
                 <span class="kw">move </span>|s| {
                     s.list()<span class="question-mark">?
                         </span>.lst_join(<span class="kw-2">&amp;</span>separator)
@@ -508,10 +497,9 @@
 
     <span class="doccomment">/// Slice every sublist.
     </span><span class="kw">pub fn </span>slice(<span class="self">self</span>, offset: Expr, length: Expr) -&gt; Expr {
-        <span class="self">self</span>.<span class="number">0</span>.apply_many_private(
+        <span class="self">self</span>.<span class="number">0</span>.map_many_private(
             FunctionExpr::ListExpr(ListFunction::Slice),
             <span class="kw-2">&amp;</span>[offset, length],
-            <span class="bool-val">false</span>,
             <span class="bool-val">false</span>,
         )
     }

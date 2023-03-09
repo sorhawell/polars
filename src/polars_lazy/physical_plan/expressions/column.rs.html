@@ -199,10 +199,6 @@
 <a href="#199" id="199">199</a>
 <a href="#200" id="200">200</a>
 <a href="#201" id="201">201</a>
-<a href="#202" id="202">202</a>
-<a href="#203" id="203">203</a>
-<a href="#204" id="204">204</a>
-<a href="#205" id="205">205</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::borrow::Cow;
 <span class="kw">use </span>std::sync::Arc;
 
@@ -373,17 +369,13 @@
     }
 
     <span class="kw">fn </span>to_field(<span class="kw-2">&amp;</span><span class="self">self</span>, input_schema: <span class="kw-2">&amp;</span>Schema) -&gt; PolarsResult&lt;Field&gt; {
-        <span class="kw">let </span>field = input_schema.get_field(<span class="kw-2">&amp;</span><span class="self">self</span>.name).ok_or_else(|| {
-            PolarsError::ColumnNotFound(
-                <span class="macro">format!</span>(
-                    <span class="string">&quot;could not find: {} in schema: {:?}&quot;</span>,
-                    <span class="self">self</span>.name, <span class="kw-2">&amp;</span>input_schema
-                )
-                .into(),
+        input_schema.get_field(<span class="kw-2">&amp;</span><span class="self">self</span>.name).ok_or_else(|| {
+            <span class="macro">polars_err!</span>(
+                ColumnNotFound: <span class="string">&quot;could not find {:?} in schema: {:?}&quot;</span>, <span class="self">self</span>.name, <span class="kw-2">&amp;</span>input_schema
             )
-        })<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(field)
+        })
     }
+
     <span class="kw">fn </span>is_valid_aggregation(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
         <span class="bool-val">false
     </span>}

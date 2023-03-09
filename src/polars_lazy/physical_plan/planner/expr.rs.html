@@ -612,8 +612,6 @@
 <a href="#612" id="612">612</a>
 <a href="#613" id="613">613</a>
 <a href="#614" id="614">614</a>
-<a href="#615" id="615">615</a>
-<a href="#616" id="616">616</a>
 </pre><pre class="rust"><code><span class="kw">use </span>polars_core::frame::groupby::GroupByMethod;
 <span class="kw">use </span>polars_core::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>polars_core::series::IsSorted;
@@ -668,13 +666,11 @@
                     apply_columns.push(Arc::from(<span class="string">&quot;count&quot;</span>))
                 } <span class="kw">else </span>{
                     <span class="kw">let </span>e = node_to_expr(function, expr_arena);
-                    <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                        <span class="macro">format!</span>(
-                            <span class="string">&quot;Cannot apply a window function, did not find a root column. \
-                        This is likely due to a syntax error in this expression: {e:?}&quot;</span>,
-                        )
-                        .into(),
-                    ));
+                    <span class="macro">polars_bail!</span>(
+                        ComputeError:
+                        <span class="string">&quot;cannot apply a window function, did not find a root column; \
+                        this is likely due to a syntax error in this expression: {:?}&quot;</span>, e
+                    );
                 }
             }
 

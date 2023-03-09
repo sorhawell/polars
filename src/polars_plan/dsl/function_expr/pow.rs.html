@@ -91,8 +91,6 @@
 <a href="#91" id="91">91</a>
 <a href="#92" id="92">92</a>
 <a href="#93" id="93">93</a>
-<a href="#94" id="94">94</a>
-<a href="#95" id="95">95</a>
 </pre><pre class="rust"><code><span class="kw">use </span>num::pow::Pow;
 <span class="kw">use </span>polars_arrow::utils::CustomIterTools;
 <span class="kw">use </span>polars_core::export::num;
@@ -113,7 +111,7 @@
     <span class="kw">if </span>exponent.len() == <span class="number">1 </span>{
         <span class="kw">let </span>exponent_value = exponent
             .get(<span class="number">0</span>)
-            .ok_or_else(|| PolarsError::ComputeError(<span class="string">&quot;exponent is null&quot;</span>.into()))<span class="question-mark">?</span>;
+            .ok_or_else(|| <span class="macro">polars_err!</span>(ComputeError: <span class="string">&quot;exponent is null&quot;</span>))<span class="question-mark">?</span>;
         <span class="kw">let </span>s = <span class="kw">match </span>exponent_value.to_f64().unwrap() {
             a <span class="kw">if </span>a == <span class="number">1.0 </span>=&gt; base.clone().into_series(),
             <span class="comment">// specialized sqrt will ensure (-inf)^0.5 = NaN
@@ -133,7 +131,7 @@
     } <span class="kw">else if </span>(base.len() == <span class="number">1</span>) &amp;&amp; (exponent.len() != <span class="number">1</span>) {
         <span class="kw">let </span>base = base
             .get(<span class="number">0</span>)
-            .ok_or_else(|| PolarsError::ComputeError(<span class="string">&quot;base is null&quot;</span>.into()))<span class="question-mark">?</span>;
+            .ok_or_else(|| <span class="macro">polars_err!</span>(ComputeError: <span class="string">&quot;base is null&quot;</span>))<span class="question-mark">?</span>;
 
         <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(
             exponent.apply(|exp| Pow::pow(base, exp)).into_series(),
@@ -178,14 +176,12 @@
     <span class="kw">let </span>exp_len = exponent.len();
     <span class="kw">match </span>(base_len, exp_len) {
         (<span class="number">1</span>, <span class="kw">_</span>) | (<span class="kw">_</span>, <span class="number">1</span>) =&gt; pow_on_series(base, exponent),
-        (len_a, len_b) <span class="kw">if </span>len_a == len_b =&gt; {
-            pow_on_series(base, exponent)
-        }
-        <span class="kw">_ </span>=&gt; {
-            <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                <span class="macro">format!</span>(<span class="string">&quot;pow expression: the exponents length: {exp_len} does not match that of the base: {base_len}. Please ensure the lengths match or consider a literal exponent.&quot;</span>).into()))
-        }
-
+        (len_a, len_b) <span class="kw">if </span>len_a == len_b =&gt; pow_on_series(base, exponent),
+        <span class="kw">_ </span>=&gt; <span class="macro">polars_bail!</span>(
+            ComputeError:
+            <span class="string">&quot;exponent shape: {} in `pow` expression does not match that of the base: {}&quot;</span>,
+            exp_len, base_len,
+        ),
     }
 }
 </code></pre></div>

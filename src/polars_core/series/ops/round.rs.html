@@ -114,25 +114,14 @@
 <a href="#114" id="114">114</a>
 <a href="#115" id="115">115</a>
 <a href="#116" id="116">116</a>
-<a href="#117" id="117">117</a>
-<a href="#118" id="118">118</a>
-<a href="#119" id="119">119</a>
-<a href="#120" id="120">120</a>
-<a href="#121" id="121">121</a>
-<a href="#122" id="122">122</a>
-<a href="#123" id="123">123</a>
-<a href="#124" id="124">124</a>
-<a href="#125" id="125">125</a>
-<a href="#126" id="126">126</a>
-<a href="#127" id="127">127</a>
-<a href="#128" id="128">128</a>
-<a href="#129" id="129">129</a>
-</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">crate</span>::prelude::<span class="kw-2">*</span>;
+</pre><pre class="rust"><code><span class="kw">use </span>num_traits::pow::Pow;
+<span class="kw">use </span>num_traits::{clamp_max, clamp_min};
+
+<span class="kw">use </span><span class="kw">crate</span>::prelude::<span class="kw-2">*</span>;
 
 <span class="kw">impl </span>Series {
     <span class="doccomment">/// Round underlying floating point array to given decimal.
     </span><span class="kw">pub fn </span>round(<span class="kw-2">&amp;</span><span class="self">self</span>, decimals: u32) -&gt; PolarsResult&lt;<span class="self">Self</span>&gt; {
-        <span class="kw">use </span>num::traits::Pow;
         <span class="kw">if let </span><span class="prelude-val">Ok</span>(ca) = <span class="self">self</span>.f32() {
             <span class="comment">// Note we do the computation on f64 floats to not loose precision
             // when the computation is done, we cast to f32
@@ -149,9 +138,7 @@
                 .into_series();
             <span class="kw">return </span><span class="prelude-val">Ok</span>(s);
         }
-        <span class="prelude-val">Err</span>(PolarsError::SchemaMisMatch(
-            <span class="macro">format!</span>(<span class="string">&quot;{:?} is not a floating point datatype&quot;</span>, <span class="self">self</span>.dtype()).into(),
-        ))
+        <span class="macro">polars_bail!</span>(opq = round, <span class="self">self</span>.dtype());
     }
 
     <span class="doccomment">/// Floor underlying floating point array to the lowest integers smaller or equal to the float value.
@@ -164,9 +151,7 @@
             <span class="kw">let </span>s = ca.apply(|val| val.floor()).into_series();
             <span class="kw">return </span><span class="prelude-val">Ok</span>(s);
         }
-        <span class="prelude-val">Err</span>(PolarsError::SchemaMisMatch(
-            <span class="macro">format!</span>(<span class="string">&quot;{:?} is not a floating point datatype&quot;</span>, <span class="self">self</span>.dtype()).into(),
-        ))
+        <span class="macro">polars_bail!</span>(opq = floor, <span class="self">self</span>.dtype());
     }
 
     <span class="doccomment">/// Ceil underlying floating point array to the highest integers smaller or equal to the float value.
@@ -179,9 +164,7 @@
             <span class="kw">let </span>s = ca.apply(|val| val.ceil()).into_series();
             <span class="kw">return </span><span class="prelude-val">Ok</span>(s);
         }
-        <span class="prelude-val">Err</span>(PolarsError::SchemaMisMatch(
-            <span class="macro">format!</span>(<span class="string">&quot;{:?} is not a floating point datatype&quot;</span>, <span class="self">self</span>.dtype()).into(),
-        ))
+        <span class="macro">polars_bail!</span>(opq = ceil, <span class="self">self</span>.dtype());
     }
 
     <span class="doccomment">/// Clamp underlying values to the `min` and `max` values.
@@ -203,15 +186,12 @@
             <span class="macro">downcast_as_macro_arg_physical_mut!</span>(mutable, apply_clip);
             <span class="prelude-val">Ok</span>(<span class="self">self</span>)
         } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(PolarsError::SchemaMisMatch(
-                <span class="macro">format!</span>(<span class="string">&quot;Cannot use &#39;clip&#39; on dtype {:?}, consider using a when -&gt; then -&gt; otherwise expression&quot;</span>, <span class="self">self</span>.dtype()).into(),
-            ))
+            <span class="macro">polars_bail!</span>(opq = clip, <span class="self">self</span>.dtype());
         }
     }
 
     <span class="doccomment">/// Clamp underlying values to the `max` value.
     </span><span class="kw">pub fn </span>clip_max(<span class="kw-2">mut </span><span class="self">self</span>, max: AnyValue&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; PolarsResult&lt;<span class="self">Self</span>&gt; {
-        <span class="kw">use </span>num::traits::clamp_max;
         <span class="kw">if </span><span class="self">self</span>.dtype().is_numeric() {
             <span class="macro">macro_rules! </span>apply_clip {
                 (<span class="macro-nonterminal">$pl_type</span>:ty, <span class="macro-nonterminal">$ca</span>:expr) =&gt; {{
@@ -226,16 +206,12 @@
             <span class="macro">downcast_as_macro_arg_physical_mut!</span>(mutable, apply_clip);
             <span class="prelude-val">Ok</span>(<span class="self">self</span>)
         } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(PolarsError::SchemaMisMatch(
-                <span class="macro">format!</span>(<span class="string">&quot;Cannot use &#39;clip&#39; on dtype {:?}, consider using a when -&gt; then -&gt; otherwise expression&quot;</span>, <span class="self">self</span>.dtype()).into(),
-            ))
+            <span class="macro">polars_bail!</span>(opq = clip_max, <span class="self">self</span>.dtype());
         }
     }
 
     <span class="doccomment">/// Clamp underlying values to the `min` value.
     </span><span class="kw">pub fn </span>clip_min(<span class="kw-2">mut </span><span class="self">self</span>, min: AnyValue&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; PolarsResult&lt;<span class="self">Self</span>&gt; {
-        <span class="kw">use </span>num::traits::clamp_min;
-
         <span class="kw">if </span><span class="self">self</span>.dtype().is_numeric() {
             <span class="macro">macro_rules! </span>apply_clip {
                 (<span class="macro-nonterminal">$pl_type</span>:ty, <span class="macro-nonterminal">$ca</span>:expr) =&gt; {{
@@ -250,9 +226,7 @@
             <span class="macro">downcast_as_macro_arg_physical_mut!</span>(mutable, apply_clip);
             <span class="prelude-val">Ok</span>(<span class="self">self</span>)
         } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(PolarsError::SchemaMisMatch(
-                <span class="macro">format!</span>(<span class="string">&quot;Cannot use &#39;clip&#39; on dtype {:?}, consider using a when -&gt; then -&gt; otherwise expression&quot;</span>, <span class="self">self</span>.dtype()).into(),
-            ))
+            <span class="macro">polars_bail!</span>(opq = clip_min, <span class="self">self</span>.dtype());
         }
     }
 }

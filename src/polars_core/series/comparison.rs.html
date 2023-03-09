@@ -368,39 +368,6 @@
 <a href="#368" id="368">368</a>
 <a href="#369" id="369">369</a>
 <a href="#370" id="370">370</a>
-<a href="#371" id="371">371</a>
-<a href="#372" id="372">372</a>
-<a href="#373" id="373">373</a>
-<a href="#374" id="374">374</a>
-<a href="#375" id="375">375</a>
-<a href="#376" id="376">376</a>
-<a href="#377" id="377">377</a>
-<a href="#378" id="378">378</a>
-<a href="#379" id="379">379</a>
-<a href="#380" id="380">380</a>
-<a href="#381" id="381">381</a>
-<a href="#382" id="382">382</a>
-<a href="#383" id="383">383</a>
-<a href="#384" id="384">384</a>
-<a href="#385" id="385">385</a>
-<a href="#386" id="386">386</a>
-<a href="#387" id="387">387</a>
-<a href="#388" id="388">388</a>
-<a href="#389" id="389">389</a>
-<a href="#390" id="390">390</a>
-<a href="#391" id="391">391</a>
-<a href="#392" id="392">392</a>
-<a href="#393" id="393">393</a>
-<a href="#394" id="394">394</a>
-<a href="#395" id="395">395</a>
-<a href="#396" id="396">396</a>
-<a href="#397" id="397">397</a>
-<a href="#398" id="398">398</a>
-<a href="#399" id="399">399</a>
-<a href="#400" id="400">400</a>
-<a href="#401" id="401">401</a>
-<a href="#402" id="402">402</a>
-<a href="#403" id="403">403</a>
 </pre><pre class="rust"><code><span class="doccomment">//! Comparison operations on Series.
 
 </span><span class="attr">#[cfg(any(
@@ -425,8 +392,7 @@
         <span class="kw">match </span>lhs.dtype() {
             DataType::Boolean =&gt; lhs.bool().unwrap().<span class="macro-nonterminal">$method</span>(rhs.bool().unwrap()),
             DataType::Utf8 =&gt; lhs.utf8().unwrap().<span class="macro-nonterminal">$method</span>(rhs.utf8().unwrap()),
-            <span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-            </span>DataType::Binary =&gt; lhs.binary().unwrap().<span class="macro-nonterminal">$method</span>(rhs.binary().unwrap()),
+            DataType::Binary =&gt; lhs.binary().unwrap().<span class="macro-nonterminal">$method</span>(rhs.binary().unwrap()),
             DataType::UInt8 =&gt; lhs.u8().unwrap().<span class="macro-nonterminal">$method</span>(rhs.u8().unwrap()),
             DataType::UInt16 =&gt; lhs.u16().unwrap().<span class="macro-nonterminal">$method</span>(rhs.u16().unwrap()),
             DataType::UInt32 =&gt; lhs.u32().unwrap().<span class="macro-nonterminal">$method</span>(rhs.u32().unwrap()),
@@ -506,27 +472,17 @@
     <span class="kw">use </span>DataType::<span class="kw-2">*</span>;
     <span class="attr">#[cfg(feature = <span class="string">&quot;dtype-categorical&quot;</span>)]
     </span>{
-        <span class="kw">if </span><span class="macro">matches!</span>(left, Utf8 | Categorical(<span class="kw">_</span>)) &amp;&amp; right.is_numeric()
-            || left.is_numeric() &amp;&amp; <span class="macro">matches!</span>(right, Utf8 | Categorical(<span class="kw">_</span>))
-        {
-            <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                <span class="string">&quot;cannot compare Utf8 with numeric data&quot;</span>.into(),
-            ))
-        } <span class="kw">else </span>{
-            <span class="prelude-val">Ok</span>(())
-        }
+        <span class="kw">let </span>mismatch = <span class="macro">matches!</span>(left, Utf8 | Categorical(<span class="kw">_</span>)) &amp;&amp; right.is_numeric()
+            || left.is_numeric() &amp;&amp; <span class="macro">matches!</span>(right, Utf8 | Categorical(<span class="kw">_</span>));
+        <span class="macro">polars_ensure!</span>(!mismatch, ComputeError: <span class="string">&quot;cannot compare utf-8 with numeric data&quot;</span>);
     }
     <span class="attr">#[cfg(not(feature = <span class="string">&quot;dtype-categorical&quot;</span>))]
     </span>{
-        <span class="kw">if </span><span class="macro">matches!</span>(left, Utf8) &amp;&amp; right.is_numeric() || left.is_numeric() &amp;&amp; <span class="macro">matches!</span>(right, Utf8)
-        {
-            <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                <span class="string">&quot;cannot compare Utf8 with numeric data&quot;</span>.into(),
-            ))
-        } <span class="kw">else </span>{
-            <span class="prelude-val">Ok</span>(())
-        }
+        <span class="kw">let </span>mismatch = <span class="macro">matches!</span>(left, Utf8) &amp;&amp; right.is_numeric()
+            || left.is_numeric() &amp;&amp; <span class="macro">matches!</span>(right, Utf8);
+        <span class="macro">polars_ensure!</span>(!mismatch, ComputeError: <span class="string">&quot;cannot compare utf-8 with numeric data&quot;</span>);
     }
+    <span class="prelude-val">Ok</span>(())
 }
 
 <span class="kw">impl </span>ChunkCompare&lt;<span class="kw-2">&amp;</span>Series&gt; <span class="kw">for </span>Series {
@@ -572,7 +528,11 @@
 
                     <span class="self">self</span>.categorical().unwrap().logical().equal(rhs)
                 } <span class="kw">else </span>{
-                    <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(<span class="string">&quot;Cannot compare categoricals originating from different sources. Consider setting a global string cache.&quot;</span>.into()));
+                    <span class="macro">polars_bail!</span>(
+                        ComputeError:
+                        <span class="string">&quot;cannot compare categoricals originating from different sources; \
+                        consider setting a global string cache&quot;
+                    </span>);
                 }
             }
             (Null, Null, <span class="kw">_</span>, <span class="kw">_</span>) =&gt; BooleanChunked::full(<span class="self">self</span>.name(), <span class="bool-val">true</span>, <span class="self">self</span>.len()),
@@ -624,7 +584,11 @@
 
                     <span class="self">self</span>.categorical().unwrap().logical().not_equal(rhs)
                 } <span class="kw">else </span>{
-                    <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(<span class="string">&quot;Cannot compare categoricals originating from different sources. Consider setting a global string cache.&quot;</span>.into()));
+                    <span class="macro">polars_bail!</span>(
+                        ComputeError:
+                        <span class="string">&quot;cannot compare categoricals originating from different sources; \
+                        consider setting a global string cache&quot;
+                    </span>);
                 }
             }
             (Null, Null, <span class="kw">_</span>, <span class="kw">_</span>) =&gt; BooleanChunked::full(<span class="self">self</span>.name(), <span class="bool-val">false</span>, <span class="self">self</span>.len()),
@@ -712,8 +676,22 @@
     }
 }
 
+<span class="kw">fn </span>compare_series_str(
+    lhs: <span class="kw-2">&amp;</span>Series,
+    rhs: <span class="kw-2">&amp;</span>str,
+    op: <span class="kw">impl </span>Fn(<span class="kw-2">&amp;</span>Utf8Chunked, <span class="kw-2">&amp;</span>str) -&gt; BooleanChunked,
+) -&gt; PolarsResult&lt;BooleanChunked&gt; {
+    validate_types(lhs.dtype(), <span class="kw-2">&amp;</span>DataType::Utf8)<span class="question-mark">?</span>;
+    lhs.utf8().map(|ca| op(ca, rhs)).map_err(|<span class="kw">_</span>| {
+        <span class="macro">polars_err!</span>(
+            ComputeError: <span class="string">&quot;cannot compare str value to series of type {}&quot;</span>, lhs.dtype(),
+        )
+    })
+}
+
 <span class="kw">impl </span>ChunkCompare&lt;<span class="kw-2">&amp;</span>str&gt; <span class="kw">for </span>Series {
     <span class="kw">type </span>Item = PolarsResult&lt;BooleanChunked&gt;;
+
     <span class="kw">fn </span>equal(<span class="kw-2">&amp;</span><span class="self">self</span>, rhs: <span class="kw-2">&amp;</span>str) -&gt; PolarsResult&lt;BooleanChunked&gt; {
         validate_types(<span class="self">self</span>.dtype(), <span class="kw-2">&amp;</span>DataType::Utf8)<span class="question-mark">?</span>;
         <span class="kw">use </span>DataType::<span class="kw-2">*</span>;
@@ -745,63 +723,19 @@
     }
 
     <span class="kw">fn </span>gt(<span class="kw-2">&amp;</span><span class="self">self</span>, rhs: <span class="kw-2">&amp;</span>str) -&gt; PolarsResult&lt;BooleanChunked&gt; {
-        validate_types(<span class="self">self</span>.dtype(), <span class="kw-2">&amp;</span>DataType::Utf8)<span class="question-mark">?</span>;
-        <span class="kw">if let </span><span class="prelude-val">Ok</span>(a) = <span class="self">self</span>.utf8() {
-            <span class="prelude-val">Ok</span>(a.gt(rhs))
-        } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                <span class="macro">format!</span>(
-                    <span class="string">&quot;cannot compare str value to series of type: {:?}&quot;</span>,
-                    <span class="self">self</span>.dtype()
-                )
-                .into(),
-            ))
-        }
+        compare_series_str(<span class="self">self</span>, rhs, |lhs, rhs| lhs.gt(rhs))
     }
 
     <span class="kw">fn </span>gt_eq(<span class="kw-2">&amp;</span><span class="self">self</span>, rhs: <span class="kw-2">&amp;</span>str) -&gt; PolarsResult&lt;BooleanChunked&gt; {
-        validate_types(<span class="self">self</span>.dtype(), <span class="kw-2">&amp;</span>DataType::Utf8)<span class="question-mark">?</span>;
-        <span class="kw">if let </span><span class="prelude-val">Ok</span>(a) = <span class="self">self</span>.utf8() {
-            <span class="prelude-val">Ok</span>(a.gt_eq(rhs))
-        } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                <span class="macro">format!</span>(
-                    <span class="string">&quot;cannot compare str value to series of type: {:?}&quot;</span>,
-                    <span class="self">self</span>.dtype()
-                )
-                .into(),
-            ))
-        }
+        compare_series_str(<span class="self">self</span>, rhs, |lhs, rhs| lhs.gt_eq(rhs))
     }
 
     <span class="kw">fn </span>lt(<span class="kw-2">&amp;</span><span class="self">self</span>, rhs: <span class="kw-2">&amp;</span>str) -&gt; PolarsResult&lt;BooleanChunked&gt; {
-        validate_types(<span class="self">self</span>.dtype(), <span class="kw-2">&amp;</span>DataType::Utf8)<span class="question-mark">?</span>;
-        <span class="kw">if let </span><span class="prelude-val">Ok</span>(a) = <span class="self">self</span>.utf8() {
-            <span class="prelude-val">Ok</span>(a.lt(rhs))
-        } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                <span class="macro">format!</span>(
-                    <span class="string">&quot;cannot compare str value to series of type: {:?}&quot;</span>,
-                    <span class="self">self</span>.dtype()
-                )
-                .into(),
-            ))
-        }
+        compare_series_str(<span class="self">self</span>, rhs, |lhs, rhs| lhs.lt(rhs))
     }
 
     <span class="kw">fn </span>lt_eq(<span class="kw-2">&amp;</span><span class="self">self</span>, rhs: <span class="kw-2">&amp;</span>str) -&gt; PolarsResult&lt;BooleanChunked&gt; {
-        validate_types(<span class="self">self</span>.dtype(), <span class="kw-2">&amp;</span>DataType::Utf8)<span class="question-mark">?</span>;
-        <span class="kw">if let </span><span class="prelude-val">Ok</span>(a) = <span class="self">self</span>.utf8() {
-            <span class="prelude-val">Ok</span>(a.lt_eq(rhs))
-        } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                <span class="macro">format!</span>(
-                    <span class="string">&quot;cannot compare str value to series of type: {:?}&quot;</span>,
-                    <span class="self">self</span>.dtype()
-                )
-                .into(),
-            ))
-        }
+        compare_series_str(<span class="self">self</span>, rhs, |lhs, rhs| lhs.lt_eq(rhs))
     }
 }
 </code></pre></div>

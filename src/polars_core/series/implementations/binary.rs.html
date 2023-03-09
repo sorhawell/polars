@@ -306,16 +306,6 @@
 <a href="#306" id="306">306</a>
 <a href="#307" id="307">307</a>
 <a href="#308" id="308">308</a>
-<a href="#309" id="309">309</a>
-<a href="#310" id="310">310</a>
-<a href="#311" id="311">311</a>
-<a href="#312" id="312">312</a>
-<a href="#313" id="313">313</a>
-<a href="#314" id="314">314</a>
-<a href="#315" id="315">315</a>
-<a href="#316" id="316">316</a>
-<a href="#317" id="317">317</a>
-<a href="#318" id="318">318</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::borrow::Cow;
 
 <span class="kw">use </span>ahash::RandomState;
@@ -446,26 +436,16 @@
     }
 
     <span class="kw">fn </span>append(<span class="kw-2">&amp;mut </span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Series) -&gt; PolarsResult&lt;()&gt; {
-        <span class="kw">if </span><span class="self">self</span>.<span class="number">0</span>.dtype() == other.dtype() {
-            <span class="comment">// todo! add object
-            </span><span class="self">self</span>.<span class="number">0</span>.append(other.as_ref().as_ref());
-            <span class="prelude-val">Ok</span>(())
-        } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(PolarsError::SchemaMisMatch(
-                <span class="string">&quot;cannot append Series; data types don&#39;t match&quot;</span>.into(),
-            ))
-        }
+        <span class="macro">polars_ensure!</span>(<span class="self">self</span>.<span class="number">0</span>.dtype() == other.dtype(), append);
+        <span class="comment">// todo! add object
+        </span><span class="self">self</span>.<span class="number">0</span>.append(other.as_ref().as_ref());
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">fn </span>extend(<span class="kw-2">&amp;mut </span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Series) -&gt; PolarsResult&lt;()&gt; {
-        <span class="kw">if </span><span class="self">self</span>.<span class="number">0</span>.dtype() == other.dtype() {
-            <span class="self">self</span>.<span class="number">0</span>.extend(other.as_ref().as_ref());
-            <span class="prelude-val">Ok</span>(())
-        } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(PolarsError::SchemaMisMatch(
-                <span class="string">&quot;cannot extend Series; data types don&#39;t match&quot;</span>.into(),
-            ))
-        }
+        <span class="macro">polars_ensure!</span>(<span class="self">self</span>.<span class="number">0</span>.dtype() == other.dtype(), extend);
+        <span class="self">self</span>.<span class="number">0</span>.extend(other.as_ref().as_ref());
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">fn </span>filter(<span class="kw-2">&amp;</span><span class="self">self</span>, filter: <span class="kw-2">&amp;</span>BooleanChunked) -&gt; PolarsResult&lt;Series&gt; {

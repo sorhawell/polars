@@ -156,20 +156,6 @@
 <a href="#156" id="156">156</a>
 <a href="#157" id="157">157</a>
 <a href="#158" id="158">158</a>
-<a href="#159" id="159">159</a>
-<a href="#160" id="160">160</a>
-<a href="#161" id="161">161</a>
-<a href="#162" id="162">162</a>
-<a href="#163" id="163">163</a>
-<a href="#164" id="164">164</a>
-<a href="#165" id="165">165</a>
-<a href="#166" id="166">166</a>
-<a href="#167" id="167">167</a>
-<a href="#168" id="168">168</a>
-<a href="#169" id="169">169</a>
-<a href="#170" id="170">170</a>
-<a href="#171" id="171">171</a>
-<a href="#172" id="172">172</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::borrow::Cow;
 <span class="kw">use </span>std::ops::Deref;
 
@@ -218,6 +204,10 @@
                 data_type,
             } =&gt; <span class="kw">match </span>data_type {
                 DataType::Int32 =&gt; {
+                    <span class="macro">polars_ensure!</span>(
+                        <span class="kw-2">*</span>low &gt;= i32::MIN <span class="kw">as </span>i64 &amp;&amp; <span class="kw-2">*</span>high &lt;= i32::MAX <span class="kw">as </span>i64,
+                        ComputeError: <span class="string">&quot;range not within bounds of `Int32`: [{}, {}]&quot;</span>, <span class="kw-2">*</span>low, <span class="kw-2">*</span>high
+                    );
                     <span class="kw">let </span>low = <span class="kw-2">*</span>low <span class="kw">as </span>i32;
                     <span class="kw">let </span>high = <span class="kw-2">*</span>high <span class="kw">as </span>i32;
                     <span class="kw">let </span>ca: NoNull&lt;Int32Chunked&gt; = (low..high).collect();
@@ -230,25 +220,21 @@
                     ca.into_inner().into_series()
                 }
                 DataType::UInt32 =&gt; {
-                    <span class="kw">if </span><span class="kw-2">*</span>low &gt;= <span class="number">0 </span>|| <span class="kw-2">*</span>high &lt;= u32::MAX <span class="kw">as </span>i64 {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                            <span class="string">&quot;range not within bounds of u32 type&quot;</span>.into(),
-                        ));
-                    }
+                    <span class="macro">polars_ensure!</span>(
+                        <span class="kw-2">*</span>low &gt;= <span class="number">0 </span>&amp;&amp; <span class="kw-2">*</span>high &lt;= u32::MAX <span class="kw">as </span>i64,
+                        ComputeError: <span class="string">&quot;range not within bounds of `UInt32`: [{}, {}]&quot;</span>, <span class="kw-2">*</span>low, <span class="kw-2">*</span>high
+                    );
                     <span class="kw">let </span>low = <span class="kw-2">*</span>low <span class="kw">as </span>u32;
                     <span class="kw">let </span>high = <span class="kw-2">*</span>high <span class="kw">as </span>u32;
                     <span class="kw">let </span>ca: NoNull&lt;UInt32Chunked&gt; = (low..high).collect();
                     ca.into_inner().into_series()
                 }
-                dt =&gt; {
-                    <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::InvalidOperation(
-                        <span class="macro">format!</span>(<span class="string">&quot;datatype {dt:?} not supported as range&quot;</span>).into(),
-                    ));
-                }
+                dt =&gt; <span class="macro">polars_bail!</span>(
+                    InvalidOperation: <span class="string">&quot;datatype `{}` is not supported as range&quot;</span>, dt
+                ),
             },
             Utf8(v) =&gt; Utf8Chunked::full(NAME, v, <span class="number">1</span>).into_series(),
-            <span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-            </span>Binary(v) =&gt; BinaryChunked::full(NAME, v, <span class="number">1</span>).into_series(),
+            Binary(v) =&gt; BinaryChunked::full(NAME, v, <span class="number">1</span>).into_series(),
             <span class="attr">#[cfg(feature = <span class="string">&quot;temporal&quot;</span>)]
             </span>DateTime(ndt, tu) =&gt; {
                 <span class="kw">use </span>polars_core::chunked_array::temporal::conversion::<span class="kw-2">*</span>;
@@ -265,26 +251,12 @@
             </span>Duration(v, tu) =&gt; {
                 <span class="kw">let </span>duration = <span class="kw">match </span>tu {
                     TimeUnit::Milliseconds =&gt; v.num_milliseconds(),
-                    TimeUnit::Microseconds =&gt; <span class="kw">match </span>v.num_microseconds() {
-                        <span class="prelude-val">Some</span>(v) =&gt; v,
-                        <span class="prelude-val">None </span>=&gt; {
-                            <span class="comment">// Overflow
-                            </span><span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::InvalidOperation(
-                                <span class="macro">format!</span>(<span class="string">&quot;cannot represent {v:?} as {tu:?}&quot;</span>).into(),
-                            ));
-                        }
-                    },
-                    TimeUnit::Nanoseconds =&gt; {
-                        <span class="kw">match </span>v.num_nanoseconds() {
-                            <span class="prelude-val">Some</span>(v) =&gt; v,
-                            <span class="prelude-val">None </span>=&gt; {
-                                <span class="comment">// Overflow
-                                </span><span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::InvalidOperation(
-                                    <span class="macro">format!</span>(<span class="string">&quot;cannot represent {v:?} as {tu:?}&quot;</span>).into(),
-                                ));
-                            }
-                        }
-                    }
+                    TimeUnit::Microseconds =&gt; v.num_microseconds().ok_or_else(
+                        || <span class="macro">polars_err!</span>(InvalidOperation: <span class="string">&quot;cannot represent {} as {}&quot;</span>, v, tu),
+                    )<span class="question-mark">?</span>,
+                    TimeUnit::Nanoseconds =&gt; v.num_nanoseconds().ok_or_else(
+                        || <span class="macro">polars_err!</span>(InvalidOperation: <span class="string">&quot;cannot represent {} as {}&quot;</span>, v, tu),
+                    )<span class="question-mark">?</span>,
                 };
                 Int64Chunked::full(NAME, duration, <span class="number">1</span>)
                     .into_duration(<span class="kw-2">*</span>tu)

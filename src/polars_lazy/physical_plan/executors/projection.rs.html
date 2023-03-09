@@ -120,7 +120,7 @@
                 .iter()
                 .map(|s| <span class="prelude-val">Ok</span>(s.to_field(<span class="kw-2">&amp;</span><span class="self">self</span>.input_schema)<span class="question-mark">?</span>.name))
                 .collect::&lt;PolarsResult&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;&gt;()<span class="question-mark">?</span>;
-            <span class="kw">let </span>name = column_delimited(<span class="string">&quot;projection&quot;</span>.to_string(), <span class="kw-2">&amp;</span>by);
+            <span class="kw">let </span>name = comma_delimited(<span class="string">&quot;projection&quot;</span>.to_string(), <span class="kw-2">&amp;</span>by);
             Cow::Owned(name)
         } <span class="kw">else </span>{
             Cow::Borrowed(<span class="string">&quot;&quot;</span>)

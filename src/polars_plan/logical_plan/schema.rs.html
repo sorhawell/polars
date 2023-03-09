@@ -269,7 +269,10 @@
 <a href="#269" id="269">269</a>
 <a href="#270" id="270">270</a>
 <a href="#271" id="271">271</a>
+<a href="#272" id="272">272</a>
+<a href="#273" id="273">273</a>
 </pre><pre class="rust"><code><span class="kw">use </span>polars_core::prelude::<span class="kw-2">*</span>;
+<span class="kw">use </span>polars_utils::format_smartstring;
 <span class="attr">#[cfg(feature = <span class="string">&quot;serde&quot;</span>)]
 </span><span class="kw">use </span>serde::{Deserialize, Serialize};
 
@@ -468,7 +471,7 @@
 
             <span class="kw">for </span>(name, dtype) <span class="kw">in </span>schema_left.iter() {
                 names.insert(name.as_str());
-                new_schema.with_column(name.to_string(), dtype.clone());
+                new_schema.with_column(name.clone(), dtype.clone());
             }
 
             <span class="comment">// make sure that expression are assigned to the schema
@@ -495,7 +498,8 @@
                         <span class="kw">if </span>schema_left.contains(<span class="kw-2">&amp;</span>field_right.name) {
                             <span class="kw">use </span>polars_core::frame::hash_join::_join_suffix_name;
                             new_schema.with_column(
-                                _join_suffix_name(<span class="kw-2">&amp;</span>field_right.name, options.suffix.as_ref()),
+                                _join_suffix_name(<span class="kw-2">&amp;</span>field_right.name, options.suffix.as_ref())
+                                    .into(),
                                 field_right.dtype,
                             );
                         } <span class="kw">else </span>{
@@ -528,10 +532,10 @@
                             }
                         }
 
-                        <span class="kw">let </span>new_name = <span class="macro">format!</span>(<span class="string">&quot;{}{}&quot;</span>, name, options.suffix.as_ref());
+                        <span class="kw">let </span>new_name = <span class="macro">format_smartstring!</span>(<span class="string">&quot;{}{}&quot;</span>, name, options.suffix.as_ref());
                         new_schema.with_column(new_name, dtype.clone());
                     } <span class="kw">else </span>{
-                        new_schema.with_column(name.to_string(), dtype.clone());
+                        new_schema.with_column(name.clone(), dtype.clone());
                     }
                 }
             }

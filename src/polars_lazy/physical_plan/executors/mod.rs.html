@@ -223,21 +223,9 @@
 <a href="#223" id="223">223</a>
 <a href="#224" id="224">224</a>
 <a href="#225" id="225">225</a>
-<a href="#226" id="226">226</a>
-<a href="#227" id="227">227</a>
-<a href="#228" id="228">228</a>
-<a href="#229" id="229">229</a>
-<a href="#230" id="230">230</a>
-<a href="#231" id="231">231</a>
-<a href="#232" id="232">232</a>
-<a href="#233" id="233">233</a>
-<a href="#234" id="234">234</a>
-<a href="#235" id="235">235</a>
-<a href="#236" id="236">236</a>
 </pre><pre class="rust"><code><span class="kw">mod </span>cache;
 <span class="kw">mod </span>drop_duplicates;
 <span class="kw">mod </span>executor;
-<span class="kw">mod </span>explode;
 <span class="kw">mod </span>ext_context;
 <span class="kw">mod </span>filter;
 <span class="kw">mod </span>groupby;
@@ -245,7 +233,6 @@
 <span class="kw">mod </span>groupby_partitioned;
 <span class="kw">mod </span>groupby_rolling;
 <span class="kw">mod </span>join;
-<span class="kw">mod </span>melt;
 <span class="kw">mod </span>projection;
 <span class="attr">#[cfg(feature = <span class="string">&quot;python&quot;</span>)]
 </span><span class="kw">mod </span>python_scan;
@@ -257,7 +244,6 @@
 <span class="kw">mod </span>union;
 
 <span class="kw">use </span>std::borrow::Cow;
-<span class="kw">use </span>std::path::PathBuf;
 
 <span class="kw">pub use </span>executor::<span class="kw-2">*</span>;
 <span class="kw">use </span>polars_core::POOL;
@@ -267,7 +253,6 @@
 
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">use </span><span class="self">self</span>::cache::<span class="kw-2">*</span>;
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">use </span><span class="self">self</span>::drop_duplicates::<span class="kw-2">*</span>;
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">use </span><span class="self">self</span>::explode::<span class="kw-2">*</span>;
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">use </span><span class="self">self</span>::ext_context::<span class="kw-2">*</span>;
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">use </span><span class="self">self</span>::filter::<span class="kw-2">*</span>;
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">use </span><span class="self">self</span>::groupby::<span class="kw-2">*</span>;
@@ -277,7 +262,6 @@
 <span class="attr">#[cfg(feature = <span class="string">&quot;dynamic_groupby&quot;</span>)]
 </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">use </span><span class="self">self</span>::groupby_rolling::<span class="kw-2">*</span>;
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">use </span><span class="self">self</span>::join::<span class="kw-2">*</span>;
-<span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">use </span><span class="self">self</span>::melt::<span class="kw-2">*</span>;
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">use </span><span class="self">self</span>::projection::<span class="kw-2">*</span>;
 <span class="attr">#[cfg(feature = <span class="string">&quot;python&quot;</span>)]
 </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">use </span><span class="self">self</span>::python_scan::<span class="kw-2">*</span>;
@@ -426,11 +410,7 @@
                 all_equal_len = <span class="bool-val">false</span>;
             }
             <span class="kw">let </span>name = s.name();
-            <span class="kw">if </span>!names.insert(name) {
-                <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::Duplicate(
-                    <span class="macro">format!</span>(<span class="string">&quot;Column with name: &#39;{name}&#39; has more than one occurrences&quot;</span>).into(),
-                ));
-            }
+            <span class="macro">polars_ensure!</span>(names.insert(name), duplicate = name);
         }
     }
     <span class="comment">// If all series are the same length it is ok. If not we can broadcast Series of length one.
@@ -438,18 +418,16 @@
         selected_columns = selected_columns
             .into_iter()
             .map(|series| {
-                <span class="kw">if </span>series.len() == <span class="number">1 </span>&amp;&amp; df_height &gt; <span class="number">1 </span>{
-                    <span class="prelude-val">Ok</span>(series.new_from_index(<span class="number">0</span>, df_height))
+                <span class="prelude-val">Ok</span>(<span class="kw">if </span>series.len() == <span class="number">1 </span>&amp;&amp; df_height &gt; <span class="number">1 </span>{
+                    series.new_from_index(<span class="number">0</span>, df_height)
                 } <span class="kw">else if </span>series.len() == df_height || series.len() == <span class="number">0 </span>{
-                    <span class="prelude-val">Ok</span>(series)
+                    series
                 } <span class="kw">else </span>{
-                    <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                        <span class="macro">format!</span>(
-                            <span class="string">&quot;Series {series:?} does not match the DataFrame height of {df_height}&quot;</span>,
-                        )
-                        .into(),
-                    ))
-                }
+                    <span class="macro">polars_bail!</span>(
+                        ComputeError: <span class="string">&quot;series length {} doesn&#39;t match the dataframe height of {}&quot;</span>,
+                        series.len(), df_height
+                    );
+                })
             })
             .collect::&lt;PolarsResult&lt;<span class="kw">_</span>&gt;&gt;()<span class="question-mark">?
     </span>}

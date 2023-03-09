@@ -30,6 +30,9 @@
 <a href="#30" id="30">30</a>
 <a href="#31" id="31">31</a>
 <a href="#32" id="32">32</a>
+<a href="#33" id="33">33</a>
+<a href="#34" id="34">34</a>
+<a href="#35" id="35">35</a>
 </pre><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::chunked_array::ops::append::new_chunks;
 <span class="kw">use </span><span class="kw">crate</span>::series::IsSorted;
@@ -49,7 +52,10 @@
             };
 
         <span class="kw">if </span>is_local_different_source {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(<span class="string">&quot;Cannot concat Categoricals coming from a different source. Consider setting a global StringCache.&quot;</span>.into()));
+            <span class="macro">polars_bail!</span>(
+                ComputeError:
+                <span class="string">&quot;cannot concat categoricals coming from a different source; consider setting a global StringCache&quot;
+            </span>);
         } <span class="kw">else </span>{
             <span class="kw">let </span>len = <span class="self">self</span>.len();
             <span class="kw">let </span>new_rev_map = <span class="self">self</span>.merge_categorical_map(other)<span class="question-mark">?</span>;

@@ -57,13 +57,13 @@
 <a href="#57" id="57">57</a>
 <a href="#58" id="58">58</a>
 <a href="#59" id="59">59</a>
-<a href="#60" id="60">60</a>
-</pre><pre class="rust"><code><span class="kw">use </span>std::ops::SubAssign;
-
-<span class="kw">use </span>polars_core::export::num;
-<span class="kw">use </span>polars_core::export::num::{Float, FromPrimitive};
-<span class="kw">use </span>polars_core::prelude::<span class="kw-2">*</span>;
-<span class="kw">use </span>polars_core::utils::with_unstable_series;
+</pre><pre class="rust"><code><span class="kw">use </span>polars_core::prelude::<span class="kw-2">*</span>;
+<span class="attr">#[cfg(feature = <span class="string">&quot;moment&quot;</span>)]
+</span><span class="kw">use </span>{
+    polars_core::export::num::{<span class="self">self</span>, Float, FromPrimitive},
+    polars_core::utils::with_unstable_series,
+    std::ops::SubAssign,
+};
 
 <span class="kw">use </span><span class="kw">crate</span>::series::ops::SeriesSealed;
 
@@ -110,9 +110,7 @@
                 <span class="kw">let </span>s = s.cast(<span class="kw-2">&amp;</span>DataType::Float64).unwrap();
                 s.rolling_skew(window_size, bias)
             }
-            dt =&gt; <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                <span class="macro">format!</span>(<span class="string">&quot;cannot use rolling_skew function on Series of dtype: {dt:?}&quot;</span>,).into(),
-            )),
+            dt =&gt; <span class="macro">polars_bail!</span>(opq = rolling_skew, dt),
         }
     }
 }

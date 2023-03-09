@@ -288,15 +288,6 @@
 <a href="#288" id="288">288</a>
 <a href="#289" id="289">289</a>
 <a href="#290" id="290">290</a>
-<a href="#291" id="291">291</a>
-<a href="#292" id="292">292</a>
-<a href="#293" id="293">293</a>
-<a href="#294" id="294">294</a>
-<a href="#295" id="295">295</a>
-<a href="#296" id="296">296</a>
-<a href="#297" id="297">297</a>
-<a href="#298" id="298">298</a>
-<a href="#299" id="299">299</a>
 </pre><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
 
 <span class="kw">impl </span>FunctionExpr {
@@ -396,9 +387,7 @@
                 <span class="kw">if let </span>DataType::Datetime(tu, <span class="kw">_</span>) = dt {
                     <span class="prelude-val">Ok</span>(DataType::Datetime(<span class="kw-2">*</span>tu, tz.cloned()))
                 } <span class="kw">else </span>{
-                    <span class="prelude-val">Err</span>(PolarsError::SchemaMisMatch(
-                        <span class="macro">format!</span>(<span class="string">&quot;expected Datetime got {dt:?}&quot;</span>).into(),
-                    ))
+                    <span class="macro">polars_bail!</span>(op = <span class="string">&quot;cast-timezone&quot;</span>, got = dt, expected = <span class="string">&quot;Datetime&quot;</span>);
                 }
             })
         };
@@ -441,8 +430,7 @@
                     </span>FromRadix { .. } =&gt; with_dtype(DataType::Int32),
                 }
             }
-            <span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-            </span>BinaryExpr(s) =&gt; {
+            BinaryExpr(s) =&gt; {
                 <span class="kw">use </span>BinaryFunction::<span class="kw-2">*</span>;
                 <span class="kw">match </span>s {
                     Contains { .. } | EndsWith(<span class="kw">_</span>) | StartsWith(<span class="kw">_</span>) =&gt; with_dtype(DataType::Boolean),
@@ -514,27 +502,21 @@
                 <span class="kw">match </span>s {
                     FieldByIndex(index) =&gt; {
                         <span class="kw">let </span>(index, <span class="kw">_</span>) = slice_offsets(<span class="kw-2">*</span>index, <span class="number">0</span>, fields.len());
-                        fields.get(index).cloned().ok_or_else(|| {
-                            PolarsError::ComputeError(
-                                <span class="string">&quot;index out of bounds in &#39;struct.field&#39;&quot;</span>.into(),
-                            )
-                        })
+                        fields.get(index).cloned().ok_or_else(
+                            || <span class="macro">polars_err!</span>(ComputeError: <span class="string">&quot;index out of bounds in `struct.field`&quot;</span>),
+                        )
                     }
                     FieldByName(name) =&gt; {
                         <span class="kw">if let </span>DataType::Struct(flds) = <span class="kw-2">&amp;</span>fields[<span class="number">0</span>].dtype {
                             <span class="kw">let </span>fld = flds
                                 .iter()
                                 .find(|fld| fld.name() == name.as_ref())
-                                .ok_or_else(|| {
-                                    PolarsError::StructFieldNotFound(
-                                        name.as_ref().to_string().into(),
-                                    )
-                                })<span class="question-mark">?</span>;
+                                .ok_or_else(
+                                    || <span class="macro">polars_err!</span>(StructFieldNotFound: <span class="string">&quot;{}&quot;</span>, name.as_ref()),
+                                )<span class="question-mark">?</span>;
                             <span class="prelude-val">Ok</span>(fld.clone())
                         } <span class="kw">else </span>{
-                            <span class="prelude-val">Err</span>(PolarsError::StructFieldNotFound(
-                                name.as_ref().to_string().into(),
-                            ))
+                            <span class="macro">polars_bail!</span>(StructFieldNotFound: <span class="string">&quot;{}&quot;</span>, name.as_ref());
                         }
                     }
                 }

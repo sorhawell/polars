@@ -175,6 +175,7 @@
 <a href="#175" id="175">175</a>
 <a href="#176" id="176">176</a>
 <a href="#177" id="177">177</a>
+<a href="#178" id="178">178</a>
 </pre><pre class="rust"><code><span class="attr">#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 #[cfg(feature = <span class="string">&quot;avro&quot;</span>)]
@@ -223,7 +224,6 @@
 </span><span class="kw">use </span>arrow::array::new_empty_array;
 <span class="kw">use </span>arrow::error::Result <span class="kw">as </span>ArrowResult;
 <span class="kw">pub use </span>options::<span class="kw-2">*</span>;
-<span class="kw">use </span>polars_core::config::verbose;
 <span class="kw">use </span>polars_core::frame::ArrowChunk;
 <span class="kw">use </span>polars_core::prelude::<span class="kw-2">*</span>;
 
@@ -239,9 +239,11 @@
 <span class="kw">where
     </span>R: Read + Seek,
 {
-    <span class="kw">fn </span>new(reader: R) -&gt; <span class="self">Self</span>;
+    <span class="doccomment">/// Create a new instance of the `[SerReader]`
+    </span><span class="kw">fn </span>new(reader: R) -&gt; <span class="self">Self</span>;
 
-    <span class="doccomment">/// Rechunk to a single chunk after Reading file.
+    <span class="doccomment">/// Make sure that all columns are contiguous in memory by
+    /// aggregating the chunks into a single array.
     </span><span class="attr">#[must_use]
     </span><span class="kw">fn </span>set_rechunk(<span class="self">self</span>, _rechunk: bool) -&gt; <span class="self">Self
     </span><span class="kw">where
@@ -313,7 +315,7 @@
                     .iter()
                     .map(|df: <span class="kw-2">&amp;</span>DataFrame| df.height())
                     .sum::&lt;usize&gt;();
-                <span class="kw">if </span>verbose() {
+                <span class="kw">if </span>polars_core::config::verbose() {
                     <span class="macro">eprintln!</span>(<span class="string">&quot;sliced off {} rows of the &#39;DataFrame&#39;. These lines were read because they were in a single chunk.&quot;</span>, df.height() - n)
                 }
                 parsed_dfs.push(df.slice(<span class="number">0</span>, len));

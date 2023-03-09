@@ -107,18 +107,6 @@
 <a href="#107" id="107">107</a>
 <a href="#108" id="108">108</a>
 <a href="#109" id="109">109</a>
-<a href="#110" id="110">110</a>
-<a href="#111" id="111">111</a>
-<a href="#112" id="112">112</a>
-<a href="#113" id="113">113</a>
-<a href="#114" id="114">114</a>
-<a href="#115" id="115">115</a>
-<a href="#116" id="116">116</a>
-<a href="#117" id="117">117</a>
-<a href="#118" id="118">118</a>
-<a href="#119" id="119">119</a>
-<a href="#120" id="120">120</a>
-<a href="#121" id="121">121</a>
 </pre><pre class="rust"><code><span class="attr">#[cfg(feature = <span class="string">&quot;dynamic_groupby&quot;</span>)]
 </span><span class="kw">use </span>polars_time::DynamicGroupOptions;
 
@@ -145,12 +133,6 @@
         <span class="kw-2">mut </span>df: DataFrame,
     ) -&gt; PolarsResult&lt;DataFrame&gt; {
         df.as_single_chunk_par();
-
-        <span class="comment">// if the periods are larger than the intervals,
-        // the groups overlap
-        </span><span class="kw">if </span><span class="self">self</span>.options.every &lt; <span class="self">self</span>.options.period {
-            state.set_has_overlapping_groups();
-        }
 
         <span class="kw">let </span>keys = <span class="self">self
             </span>.keys
@@ -183,13 +165,7 @@
                 .par_iter()
                 .map(|expr| {
                     <span class="kw">let </span>agg = expr.evaluate_on_groups(<span class="kw-2">&amp;</span>df, groups, state)<span class="question-mark">?</span>.finalize();
-                    <span class="kw">if </span>agg.len() != groups.len() {
-                        <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                            <span class="macro">format!</span>(<span class="string">&quot;returned aggregation is a different length: {} than the group lengths: {}&quot;</span>,
-                                    agg.len(),
-                                    groups.len()).into()
-                        ))
-                    }
+                    <span class="macro">polars_ensure!</span>(agg.len() == groups.len(), agg_len = agg.len(), groups.len());
                     <span class="prelude-val">Ok</span>(agg)
                 })
                 .collect::&lt;PolarsResult&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;&gt;()
@@ -226,7 +202,7 @@
                 .iter()
                 .map(|s| <span class="prelude-val">Ok</span>(s.to_field(<span class="kw-2">&amp;</span><span class="self">self</span>.input_schema)<span class="question-mark">?</span>.name))
                 .collect::&lt;PolarsResult&lt;Vec&lt;<span class="kw">_</span>&gt;&gt;&gt;()<span class="question-mark">?</span>;
-            <span class="kw">let </span>name = column_delimited(<span class="string">&quot;groupby_dynamic&quot;</span>.to_string(), <span class="kw-2">&amp;</span>by);
+            <span class="kw">let </span>name = comma_delimited(<span class="string">&quot;groupby_dynamic&quot;</span>.to_string(), <span class="kw-2">&amp;</span>by);
             Cow::Owned(name)
         } <span class="kw">else </span>{
             Cow::Borrowed(<span class="string">&quot;&quot;</span>)

@@ -22,10 +22,7 @@
 <a href="#22" id="22">22</a>
 <a href="#23" id="23">23</a>
 <a href="#24" id="24">24</a>
-<a href="#25" id="25">25</a>
-<a href="#26" id="26">26</a>
-</pre><pre class="rust"><code><span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-</span><span class="kw">mod </span>binary;
+</pre><pre class="rust"><code><span class="kw">mod </span>binary;
 <span class="attr">#[cfg(feature = <span class="string">&quot;interpolate&quot;</span>)]
 </span><span class="kw">mod </span>interpolate;
 <span class="kw">pub mod </span>list;
@@ -36,8 +33,7 @@
 <span class="attr">#[cfg(feature = <span class="string">&quot;top_k&quot;</span>)]
 </span><span class="kw">mod </span>top_k;
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-</span><span class="kw">pub use </span>binary::<span class="kw-2">*</span>;
+<span class="kw">pub use </span>binary::<span class="kw-2">*</span>;
 <span class="attr">#[cfg(feature = <span class="string">&quot;interpolate&quot;</span>)]
 </span><span class="kw">pub use </span>interpolate::<span class="kw-2">*</span>;
 <span class="kw">pub use </span>list::<span class="kw-2">*</span>;

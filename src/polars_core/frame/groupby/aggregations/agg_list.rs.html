@@ -609,7 +609,8 @@
 
 <span class="kw">impl </span>AggList <span class="kw">for </span>Utf8Chunked {
     <span class="kw">unsafe fn </span>agg_list(<span class="kw-2">&amp;</span><span class="self">self</span>, groups: <span class="kw-2">&amp;</span>GroupsProxy) -&gt; Series {
-        <span class="kw">match </span>groups {
+        <span class="comment">// TODO: dispatch via binary
+        </span><span class="kw">match </span>groups {
             GroupsProxy::Idx(groups) =&gt; {
                 <span class="kw">let </span><span class="kw-2">mut </span>builder =
                     ListUtf8ChunkedBuilder::new(<span class="self">self</span>.name(), groups.len(), <span class="self">self</span>.len());
@@ -632,8 +633,7 @@
     }
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-</span><span class="kw">impl </span>AggList <span class="kw">for </span>BinaryChunked {
+<span class="kw">impl </span>AggList <span class="kw">for </span>BinaryChunked {
     <span class="kw">unsafe fn </span>agg_list(<span class="kw-2">&amp;</span><span class="self">self</span>, groups: <span class="kw-2">&amp;</span>GroupsProxy) -&gt; Series {
         <span class="kw">match </span>groups {
             GroupsProxy::Idx(groups) =&gt; {

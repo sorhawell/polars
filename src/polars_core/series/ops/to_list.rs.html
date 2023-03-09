@@ -172,8 +172,6 @@
 <a href="#172" id="172">172</a>
 <a href="#173" id="173">173</a>
 <a href="#174" id="174">174</a>
-<a href="#175" id="175">175</a>
-<a href="#176" id="176">176</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::borrow::Cow;
 
 <span class="kw">use </span>arrow::offset::Offsets;
@@ -267,12 +265,10 @@
         }
 
         <span class="kw">let </span>prod = dims.iter().product::&lt;i64&gt;() <span class="kw">as </span>usize;
-        <span class="kw">if </span>prod != s_ref.len() {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                <span class="macro">format!</span>(<span class="string">&quot;cannot reshape len {} into shape {:?}&quot;</span>, s_ref.len(), dims).into(),
-            ));
-        }
-
+        <span class="macro">polars_ensure!</span>(
+            prod == s_ref.len(),
+            ComputeError: <span class="string">&quot;cannot reshape len {} into shape {:?}&quot;</span>, s_ref.len(), dims,
+        );
         <span class="kw">match </span>dims.len() {
             <span class="number">1 </span>=&gt; <span class="prelude-val">Ok</span>(s_ref.slice(<span class="number">0</span>, dims[<span class="number">0</span>] <span class="kw">as </span>usize)),
             <span class="number">2 </span>=&gt; {

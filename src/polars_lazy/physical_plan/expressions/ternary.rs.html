@@ -356,7 +356,6 @@
 <a href="#356" id="356">356</a>
 <a href="#357" id="357">357</a>
 <a href="#358" id="358">358</a>
-<a href="#359" id="359">359</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::sync::Arc;
 
 <span class="kw">use </span>polars_arrow::utils::CustomIterTools;
@@ -364,7 +363,6 @@
 <span class="kw">use </span>polars_core::prelude::<span class="kw-2">*</span>;
 <span class="kw">use </span>polars_core::POOL;
 
-<span class="kw">use </span><span class="kw">crate</span>::physical_plan::expression_err;
 <span class="kw">use </span><span class="kw">crate</span>::physical_plan::state::ExecutionState;
 <span class="kw">use </span><span class="kw">crate</span>::prelude::<span class="kw-2">*</span>;
 
@@ -545,12 +543,12 @@
                 }
                 <span class="kw">let </span>mask = mask_s.bool()<span class="question-mark">?</span>;
                 <span class="kw">let </span>check_length = |ca: <span class="kw-2">&amp;</span>ListChunked, mask: <span class="kw-2">&amp;</span>BooleanChunked| {
-                    <span class="kw">if </span>ca.len() != mask.len() {
-                        <span class="kw">let </span>msg = <span class="macro">format!</span>(<span class="string">&quot;The predicates length: &#39;{}&#39; does not match the length of the groups: {}.&quot;</span>, mask.len(), ca.len());
-                        <span class="prelude-val">Err</span>(<span class="macro">expression_err!</span>(msg, <span class="self">self</span>.expr, ComputeError))
-                    } <span class="kw">else </span>{
-                        <span class="prelude-val">Ok</span>(())
-                    }
+                    <span class="macro">polars_ensure!</span>(
+                        ca.len() == mask.len(), expr = <span class="self">self</span>.expr, ComputeError:
+                        <span class="string">&quot;predicates length: {} does not match groups length: {}&quot;</span>,
+                        mask.len(), ca.len()
+                    );
+                    <span class="prelude-val">Ok</span>(())
                 };
 
                 <span class="kw">if </span>ac_falsy.is_literal() &amp;&amp; <span class="self">self</span>.falsy.as_expression().map(has_null) == <span class="prelude-val">Some</span>(<span class="bool-val">true</span>) {

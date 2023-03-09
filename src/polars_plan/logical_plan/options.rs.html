@@ -359,6 +359,7 @@
     <span class="kw">pub </span>row_count: <span class="prelude-ty">Option</span>&lt;RowCount&gt;,
     <span class="kw">pub </span>file_counter: FileCount,
     <span class="kw">pub </span>low_memory: bool,
+    <span class="kw">pub </span>use_statistics: bool,
 }
 
 <span class="attr">#[cfg(feature = <span class="string">&quot;parquet&quot;</span>)]
@@ -561,8 +562,7 @@
 #[cfg_attr(feature = <span class="string">&quot;serde&quot;</span>, derive(Serialize, Deserialize))]
 </span><span class="kw">pub struct </span>SortArguments {
     <span class="kw">pub </span>descending: Vec&lt;bool&gt;,
-    <span class="comment">// Can only be true in case of a single column.
-    </span><span class="kw">pub </span>nulls_last: bool,
+    <span class="kw">pub </span>nulls_last: bool,
     <span class="kw">pub </span>slice: <span class="prelude-ty">Option</span>&lt;(i64, usize)&gt;,
 }
 

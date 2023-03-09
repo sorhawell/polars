@@ -76,7 +76,11 @@
 <a href="#76" id="76">76</a>
 <a href="#77" id="77">77</a>
 <a href="#78" id="78">78</a>
+<a href="#79" id="79">79</a>
+<a href="#80" id="80">80</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::collections::BTreeSet;
+
+<span class="kw">use </span>smartstring::alias::String <span class="kw">as </span>SmartString;
 
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
@@ -103,8 +107,8 @@
     acc_projections: <span class="kw-2">&amp;mut </span>[Node],
     projected_names: <span class="kw-2">&amp;mut </span>PlHashSet&lt;Arc&lt;str&gt;&gt;,
     expr_arena: <span class="kw-2">&amp;mut </span>Arena&lt;AExpr&gt;,
-    existing: <span class="kw-2">&amp;</span>[String],
-    new: <span class="kw-2">&amp;</span>[String],
+    existing: <span class="kw-2">&amp;</span>[SmartString],
+    new: <span class="kw-2">&amp;</span>[SmartString],
     swapping: bool,
 ) -&gt; PolarsResult&lt;()&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>processed = BTreeSet::new();

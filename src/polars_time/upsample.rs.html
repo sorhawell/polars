@@ -337,7 +337,7 @@
     <span class="kw">use </span>DataType::<span class="kw-2">*</span>;
     <span class="kw">match </span>index_column.dtype() {
         Datetime(tu, tz) =&gt; {
-            <span class="kw">let </span>s = index_column.cast(<span class="kw-2">&amp;</span>DataType::Int64).unwrap();
+            <span class="kw">let </span>s = index_column.cast(<span class="kw-2">&amp;</span>Int64).unwrap();
             <span class="kw">let </span>ca = s.i64().unwrap();
             <span class="kw">let </span>first = ca.into_iter().flatten().next();
             <span class="kw">let </span>last = ca.into_iter().flatten().next_back();
@@ -382,14 +382,14 @@
                         <span class="prelude-val">None</span>,
                     )
                 }
-                <span class="kw">_ </span>=&gt; <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                    <span class="string">&quot;Cannot determine upsample boundaries. All elements are null.&quot;</span>.into(),
-                )),
+                <span class="kw">_ </span>=&gt; <span class="macro">polars_bail!</span>(
+                    ComputeError: <span class="string">&quot;cannot determine upsample boundaries: all elements are null&quot;
+                </span>),
             }
         }
-        dt =&gt; <span class="prelude-val">Err</span>(PolarsError::ComputeError(
-            <span class="macro">format!</span>(<span class="string">&quot;upsample not allowed for index_column of dtype {dt:?}&quot;</span>).into(),
-        )),
+        dt =&gt; <span class="macro">polars_bail!</span>(
+            ComputeError: <span class="string">&quot;upsample not allowed for index column of dtype {}&quot;</span>, dt,
+        ),
     }
 }
 </code></pre></div>

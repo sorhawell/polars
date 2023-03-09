@@ -112,13 +112,6 @@
 <a href="#112" id="112">112</a>
 <a href="#113" id="113">113</a>
 <a href="#114" id="114">114</a>
-<a href="#115" id="115">115</a>
-<a href="#116" id="116">116</a>
-<a href="#117" id="117">117</a>
-<a href="#118" id="118">118</a>
-<a href="#119" id="119">119</a>
-<a href="#120" id="120">120</a>
-<a href="#121" id="121">121</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::hash::Hash;
 
 <span class="kw">use </span>arrow::array::BooleanArray;
@@ -149,8 +142,7 @@
     <span class="kw">unsafe </span>{ BooleanChunked::from_chunks(ca.name(), chunks) }
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-</span><span class="kw">fn </span>is_first_bin(ca: <span class="kw-2">&amp;</span>BinaryChunked) -&gt; BooleanChunked {
+<span class="kw">fn </span>is_first_bin(ca: <span class="kw-2">&amp;</span>BinaryChunked) -&gt; BooleanChunked {
     <span class="kw">let </span><span class="kw-2">mut </span>unique = PlHashSet::new();
     <span class="kw">let </span>chunks = ca
         .downcast_iter()
@@ -206,13 +198,11 @@
             <span class="kw">let </span>ca = s.bool().unwrap();
             is_first_boolean(ca)
         }
-        <span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-        </span>Binary =&gt; {
+        Binary =&gt; {
             <span class="kw">let </span>ca = s.binary().unwrap();
             is_first_bin(ca)
         }
-        <span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-        </span>Utf8 =&gt; {
+        Utf8 =&gt; {
             <span class="kw">let </span>s = s.cast(<span class="kw-2">&amp;</span>Binary).unwrap();
             <span class="kw">return </span>is_first(<span class="kw-2">&amp;</span>s);
         }
@@ -232,11 +222,7 @@
         }
         <span class="attr">#[cfg(feature = <span class="string">&quot;dtype-struct&quot;</span>)]
         </span>Struct(<span class="kw">_</span>) =&gt; <span class="kw">return </span>is_first_struct(<span class="kw-2">&amp;</span>s),
-        dt =&gt; {
-            <span class="kw">return </span><span class="prelude-val">Err</span>(PolarsError::ComputeError(
-                <span class="macro">format!</span>(<span class="string">&quot;Dtype {dt} not supported in &#39;is_first&#39; operation.&quot;</span>).into(),
-            ))
-        }
+        dt =&gt; <span class="macro">polars_bail!</span>(opq = is_first, dt),
     };
     <span class="prelude-val">Ok</span>(out)
 }

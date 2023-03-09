@@ -166,7 +166,7 @@
 </pre><pre class="rust"><code><span class="doccomment">//! kernels that combine take and aggregations.
 </span><span class="kw">use </span>arrow::array::{PrimitiveArray, Utf8Array};
 <span class="kw">use </span>arrow::types::NativeType;
-<span class="kw">use </span>num::{NumCast, ToPrimitive};
+<span class="kw">use </span>num_traits::{NumCast, ToPrimitive};
 
 <span class="kw">use </span><span class="kw">crate</span>::array::PolarsArray;
 <span class="kw">use </span><span class="kw">crate</span>::index::IdxSize;

@@ -43,8 +43,8 @@
 
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>rename_impl(
     <span class="kw-2">mut </span>df: DataFrame,
-    existing: <span class="kw-2">&amp;</span>[String],
-    new: <span class="kw-2">&amp;</span>[String],
+    existing: <span class="kw-2">&amp;</span>[SmartString],
+    new: <span class="kw-2">&amp;</span>[SmartString],
 ) -&gt; PolarsResult&lt;DataFrame&gt; {
     <span class="kw">let </span>positions = existing
         .iter()
@@ -65,8 +65,8 @@
 
 <span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>rename_schema&lt;<span class="lifetime">&#39;a</span>&gt;(
     input_schema: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>SchemaRef,
-    existing: <span class="kw-2">&amp;</span>[String],
-    new: <span class="kw-2">&amp;</span>[String],
+    existing: <span class="kw-2">&amp;</span>[SmartString],
+    new: <span class="kw-2">&amp;</span>[SmartString],
 ) -&gt; PolarsResult&lt;Cow&lt;<span class="lifetime">&#39;a</span>, SchemaRef&gt;&gt; {
     <span class="kw">let </span><span class="kw-2">mut </span>new_schema = (<span class="kw-2">**</span>input_schema).clone();
     <span class="kw">for </span>(old, new) <span class="kw">in </span>existing.iter().zip(new.iter()) {

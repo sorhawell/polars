@@ -79,7 +79,12 @@
 <a href="#79" id="79">79</a>
 <a href="#80" id="80">80</a>
 <a href="#81" id="81">81</a>
-</pre><pre class="rust"><code><span class="kw">use </span>polars_core::cloud::CloudOptions;
+<a href="#82" id="82">82</a>
+<a href="#83" id="83">83</a>
+<a href="#84" id="84">84</a>
+</pre><pre class="rust"><code><span class="kw">use </span>std::path::PathBuf;
+
+<span class="kw">use </span>polars_core::cloud::CloudOptions;
 
 <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
@@ -124,6 +129,7 @@
             .with_row_count(mem::take(<span class="kw-2">&amp;mut </span><span class="self">self</span>.options.row_count))
             .set_rechunk(<span class="self">self</span>.options.rechunk)
             .set_low_memory(<span class="self">self</span>.options.low_memory)
+            .use_statistics(<span class="self">self</span>.options.use_statistics)
             ._finish_with_scan_ops(predicate, projection.as_ref().map(|v| v.as_ref()))
     }
 }
@@ -140,11 +146,11 @@
         };
 
         <span class="kw">let </span>profile_name = <span class="kw">if </span>state.has_node_timer() {
-            <span class="kw">let </span><span class="kw-2">mut </span>ids = <span class="macro">vec!</span>[<span class="self">self</span>.path.to_string_lossy().to_string()];
+            <span class="kw">let </span><span class="kw-2">mut </span>ids = <span class="macro">vec!</span>[<span class="self">self</span>.path.to_string_lossy().into()];
             <span class="kw">if </span><span class="self">self</span>.predicate.is_some() {
-                ids.push(<span class="string">&quot;predicate&quot;</span>.to_string())
+                ids.push(<span class="string">&quot;predicate&quot;</span>.into())
             }
-            <span class="kw">let </span>name = column_delimited(<span class="string">&quot;parquet&quot;</span>.to_string(), <span class="kw-2">&amp;</span>ids);
+            <span class="kw">let </span>name = comma_delimited(<span class="string">&quot;parquet&quot;</span>.to_string(), <span class="kw-2">&amp;</span>ids);
             Cow::Owned(name)
         } <span class="kw">else </span>{
             Cow::Borrowed(<span class="string">&quot;&quot;</span>)

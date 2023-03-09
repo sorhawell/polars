@@ -28,7 +28,11 @@
 <a href="#28" id="28">28</a>
 <a href="#29" id="29">29</a>
 <a href="#30" id="30">30</a>
-</pre><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href="#31" id="31">31</a>
+<a href="#32" id="32">32</a>
+</pre><pre class="rust"><code><span class="kw">use </span>polars_core::error::to_compute_err;
+
+<span class="kw">use super</span>::<span class="kw-2">*</span>;
 <span class="kw">use </span><span class="kw">crate</span>::prelude::{AnonymousScan, AnonymousScanOptions, LazyJsonLineReader};
 
 <span class="kw">impl </span>AnonymousScan <span class="kw">for </span>LazyJsonLineReader {
@@ -48,8 +52,8 @@
         <span class="kw">let </span>f = std::fs::File::open(<span class="kw-2">&amp;</span><span class="self">self</span>.path)<span class="question-mark">?</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>reader = std::io::BufReader::new(f);
 
-        <span class="kw">let </span>data_type = arrow_ndjson::read::infer(<span class="kw-2">&amp;mut </span>reader, infer_schema_length)
-            .map_err(|err| PolarsError::ComputeError(<span class="macro">format!</span>(<span class="string">&quot;{err:#?}&quot;</span>).into()))<span class="question-mark">?</span>;
+        <span class="kw">let </span>data_type =
+            arrow_ndjson::read::infer(<span class="kw-2">&amp;mut </span>reader, infer_schema_length).map_err(to_compute_err)<span class="question-mark">?</span>;
         <span class="kw">let </span>schema: Schema = StructArray::get_fields(<span class="kw-2">&amp;</span>data_type).iter().into();
 
         <span class="prelude-val">Ok</span>(schema)

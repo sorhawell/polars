@@ -257,7 +257,6 @@
 <a href="#257" id="257">257</a>
 <a href="#258" id="258">258</a>
 <a href="#259" id="259">259</a>
-<a href="#260" id="260">260</a>
 </pre><pre class="rust"><code><span class="kw">use </span>arrow::compute::concatenate::concatenate;
 <span class="kw">use </span>arrow::Either;
 
@@ -380,8 +379,7 @@
     }
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;dtype-binary&quot;</span>)]
-#[doc(hidden)]
+<span class="attr">#[doc(hidden)]
 </span><span class="kw">impl </span>BinaryChunked {
     <span class="kw">pub fn </span>extend(<span class="kw-2">&amp;mut </span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) {
         <span class="kw">if </span><span class="self">self</span>.chunks.len() &gt; <span class="number">1 </span>{

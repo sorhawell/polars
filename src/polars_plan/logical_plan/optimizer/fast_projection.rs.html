@@ -148,7 +148,7 @@
         <span class="kw">let </span>lp = ALogicalPlan::MapFunction {
             input,
             function: FunctionNode::FastProjection {
-                columns: Arc::new(columns),
+                columns: Arc::from(columns),
             },
         };
 

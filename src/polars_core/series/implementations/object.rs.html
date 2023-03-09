@@ -266,11 +266,6 @@
 <a href="#266" id="266">266</a>
 <a href="#267" id="267">267</a>
 <a href="#268" id="268">268</a>
-<a href="#269" id="269">269</a>
-<a href="#270" id="270">270</a>
-<a href="#271" id="271">271</a>
-<a href="#272" id="272">272</a>
-<a href="#273" id="273">273</a>
 </pre><pre class="rust"><code><span class="kw">use </span>std::any::Any;
 <span class="kw">use </span>std::borrow::Cow;
 
@@ -365,18 +360,15 @@
     }
 
     <span class="kw">fn </span>append(<span class="kw-2">&amp;mut </span><span class="self">self</span>, other: <span class="kw-2">&amp;</span>Series) -&gt; PolarsResult&lt;()&gt; {
-        <span class="kw">if </span><span class="self">self</span>.dtype() == other.dtype() {
-            ObjectChunked::append(<span class="kw-2">&amp;mut </span><span class="self">self</span>.<span class="number">0</span>, other.as_ref().as_ref());
-            <span class="prelude-val">Ok</span>(())
-        } <span class="kw">else </span>{
-            <span class="prelude-val">Err</span>(PolarsError::SchemaMisMatch(
-                <span class="string">&quot;cannot append Series; data types don&#39;t match&quot;</span>.into(),
-            ))
+        <span class="kw">if </span><span class="self">self</span>.dtype() != other.dtype() {
+            <span class="macro">polars_bail!</span>(append);
         }
+        ObjectChunked::append(<span class="kw-2">&amp;mut </span><span class="self">self</span>.<span class="number">0</span>, other.as_ref().as_ref());
+        <span class="prelude-val">Ok</span>(())
     }
 
     <span class="kw">fn </span>extend(<span class="kw-2">&amp;mut </span><span class="self">self</span>, _other: <span class="kw-2">&amp;</span>Series) -&gt; PolarsResult&lt;()&gt; {
-        <span class="macro">panic!</span>(<span class="string">&quot;extend not implemented for Object dtypes&quot;</span>)
+        <span class="macro">polars_bail!</span>(opq = extend, <span class="self">self</span>.dtype());
     }
 
     <span class="kw">fn </span>filter(<span class="kw-2">&amp;</span><span class="self">self</span>, filter: <span class="kw-2">&amp;</span>BooleanChunked) -&gt; PolarsResult&lt;Series&gt; {
@@ -441,9 +433,7 @@
     }
 
     <span class="kw">fn </span>cast(<span class="kw-2">&amp;</span><span class="self">self</span>, _data_type: <span class="kw-2">&amp;</span>DataType) -&gt; PolarsResult&lt;Series&gt; {
-        <span class="prelude-val">Err</span>(PolarsError::InvalidOperation(
-            <span class="string">&quot;cannot cast array of type ObjectChunked to arrow datatype&quot;</span>.into(),
-        ))
+        <span class="macro">polars_bail!</span>(opq = cast, <span class="self">self</span>.dtype());
     }
 
     <span class="kw">fn </span>get(<span class="kw-2">&amp;</span><span class="self">self</span>, index: usize) -&gt; PolarsResult&lt;AnyValue&gt; {

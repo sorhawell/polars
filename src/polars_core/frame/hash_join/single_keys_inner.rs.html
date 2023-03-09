@@ -85,7 +85,11 @@
 <a href="#85" id="85">85</a>
 <a href="#86" id="86">86</a>
 <a href="#87" id="87">87</a>
-</pre><pre class="rust"><code><span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href="#88" id="88">88</a>
+<a href="#89" id="89">89</a>
+</pre><pre class="rust"><code><span class="kw">use </span><span class="kw">super</span>::single_keys::create_probe_table;
+<span class="kw">use super</span>::<span class="kw-2">*</span>;
+<span class="kw">use </span><span class="kw">crate</span>::frame::hash_join::single_keys::probe_to_offsets;
 
 <span class="doccomment">/// Probe the build table and add tuples to the results (inner join)
 </span><span class="kw">pub</span>(<span class="kw">super</span>) <span class="kw">fn </span>probe_inner&lt;T, F&gt;(
